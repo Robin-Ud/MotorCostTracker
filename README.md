@@ -1,8 +1,8 @@
 # MotoRegis 🏍️
 
-Um sistema minimalista via linha de comando (CLI)(inicialmente) para registro de abastecimentos, manutenções e customizações de motocicletas. Desenvolvido com foco em velocidade, **baixa fricção** e na filosofia KISS (*Keep It Simple, Stupid*).
+Um sistema minimalista via linha de comando (CLI) (inicialmente) para registro de abastecimentos, manutenções e customizações de motores. Desenvolvido com foco em velocidade, **baixa fricção** e na filosofia KISS (*Keep It Simple, Stupid*).
 
-Pensado para uso rápido em cotidiano via Termux, com os dados sendo versionados via Git para análises posteriores no PC(inicialmente).
+Pensado para uso rápido em cotidiano via Termux, com os dados sendo versionados via Git para análises posteriores no PC (inicialmente).
 
 ---
 
@@ -12,20 +12,21 @@ O projeto é estritamente dividido para manter a simplicidade e a segurança dos
 * **Interface e Lógica:** Script em Python puro.
 * **Armazenamento:** Arquivo `.csv` (agnóstico e perfeito para análise de dados).
 * **Configuração:** Arquivo `.json` estritamente **somente leitura** pelo script.
-* **Manutenção das configurações** Script em Python puro dedicado a isso ou manualmente
+* **Manutenção das configurações:** Script em Python puro dedicado a isso ou manualmente.
 
 ---
 
 ## ⚙️ Configuração
 
-Para evitar acidentes e simplificar o código, o script de acesso ao usuario não altera as configurações. A mudança de configurações deve ser realizada manualmente ou via script dedicado guardado em uma pasta oculta
-
+Para evitar acidentes e simplificar o código, o script de acesso ao usuário não altera as configurações. A mudança de configurações deve ser realizada manualmente ou via script dedicado guardado em uma pasta oculta.
 
 **Exemplo de config.json:**
-
-    ```
-    motos = [virago 98, Himalayan 411]
-    moto_padrão = motos[1]
+```json
+{
+  "veiculos": ["Virago 98", "Himalayan 411"],
+  "veiculo_padrao": "Himalayan 411"
+}
+```
 
 ---
 
@@ -38,15 +39,32 @@ Todos os registros são salvos no arquivo configurado, seguindo a estrutura de c
 | `data` | String | Data do registro | 2026-04-14 |
 | `moto` | String | Identificador da moto (puxado do config) | Himalayan 411 |
 | `odometro` | Int | Quilometragem atual | 15400 |
-| `tipo` | Int | Categoria do gasto (1: Abast, 2: Manut_per, 3:Manut, 4:Acessor ) | 1 |
+| `tipo` | Int | Categoria do gasto (1: Abast, 2: Manut_per, 3: Manut, 4: Acessor) | 1 |
 | `valor_gasto`| Float | Custo total da operação em Reais | 85.50 |
-| `detalhes` | String | Litros, peça trocada ou local | oléo motor |
+| `detalhes` | String | Litros, peça trocada ou local | oleo_motor |
 | `litros` | Float | total em L abastecidos | 14.2 |
 
 ---
 
 ## 🚀 Como Usar
 
+1. Execute o script no terminal:
+   ```bash
+   python3 motoregis.py
+   ```
+2. Verifique se o registro de interesse corresponde à moto e à data apresentadas inicialmente pelo script.
+3. Siga o menu interativo:
+   * `1` - Abastecimento
+   * `2` - Manutenção Periódica
+   * `3` - Outras Manutenções
+   * `4` - Acessórios
+4. Sincronize via Git caso tenha internet.
+
+---
+
+## 📊 Fluxo de Funcionamento
+
+```mermaid
 graph TD
     %% Definição do Início
     Start[Início do Código<br>Mostra Moto e Data Selecionadas] --> Menu{Menu Principal}
@@ -85,6 +103,7 @@ graph TD
 
     Salvar --> Alertas[Avisa se há manutenção atrasada]
     Alertas --> Fim[Imprime Sucesso e Sincroniza via Git]
+```
 
 ---
 
@@ -93,4 +112,4 @@ graph TD
 - [ ] **Validadores Robustos:** Implementar funções isoladas para validar inputs (impedir odômetro regressivo, barrar valores negativos).
 - [ ] **Sync Automático:** Integrar comandos do Git diretamente no Python para fazer *commit* e *push* silenciosos após cada novo registro.
 - [ ] **Evolução da Interface:** A lógica de validação e I/O de dados está isolada. No futuro, avaliar a migração da CLI atual para uma TUI (ex: Textual/Rich) ou uma GUI Mobile (Flet), mantendo o mesmo arquivo CSV como base.
-- [ ] **Analise dos dados** geradas no proprio cell caso migre pra TUI ou GUI ou somente no computador caso siga apenas via linha de comando
+- [ ] **Análise dos dados:** Geradas no próprio celular caso migre pra TUI ou GUI, ou somente no computador caso siga apenas via linha de comando.
