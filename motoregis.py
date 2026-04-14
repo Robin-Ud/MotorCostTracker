@@ -1,17 +1,25 @@
-
 """
-otimo, então acho que deve dar pra fracionar as funções, seguindo o DRY a captura de valores pra coluna valor e litros/oque pode ser utilizado funções especificas
+MotoRegis - Motor Cost Tracker
+---------------------------------------------------------
+Manifesto de Desenvolvimento:
+1. KISS (Keep It Simple, Stupid): Priorize a simplicidade. 
+   Se uma lógica pode ser resolvida com menos linhas e menos pacotes, faça-o.
+2. DRY (Don't Repeat Yourself): Funções de captura e validação devem ser genéricas.
+3. Baixa Fricção: O fluxo deve ser otimizado para uso rápido via Termux.
+4. Portabilidade: Dados em CSV para garantir que o usuário seja dono da informação.
+5. Agnosticismo de Interface: A lógica de validação deve ser isolada da captura
+   de input, facilitando futura migração para TUI/GUI.
 
-como estarei lidando com usuario final a validação de inputs é essencial, valores negativos, odo menor que o anterior, valores diferentes das opções nos menus de seleção devem sere re solicitados
-
-a captura de inputs deve ser documentada e bem demarcada pra caso haja a migração da linha de comando para TUI ou GUI
-
-e Keep It Simple Stupid
+Desenvolvido por: @Robin-Ud
+Licença: GNU GPLv3
+---------------------------------------------------------
 """
 
-import csv
 import json
+import csv
+import os
 from datetime import datetime
+
 
 # ==========================================
 # ZONA 1: MOTORES DE DADOS (JSON e CSV)
