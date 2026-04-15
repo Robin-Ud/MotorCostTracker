@@ -31,6 +31,38 @@ from datetime import datetime
 # Garantem que o usuário não digite letras onde vai número, etc.
 # ==========================================
 
+def select_index(msg, range_max):
+    while True:
+        try:
+            # O input e a conversão precisam estar DENTRO do try
+            buffer = int(input(msg))
+            
+            # range(1, 5) vai de 1 a 4. 
+            # Se você quer incluir o range_max, use range_max + 1
+            if buffer in range(0, range_max + 1):
+                return buffer
+            else:
+                print(f'❌ Digite apenas valores de 0 a {range_max}')
+        except ValueError:
+            print('❌ Por favor, digite apenas números inteiros')
+
+def get_float(msg):
+    while True:
+        # 1. Captura a string primeiro
+        entrada = input(msg).strip().replace(',', '.')
+        try:
+            # 2. Tenta converter
+            valor = float(entrada)
+            if valor >= 0:
+                return valor
+            else:
+                print('❌ Digite apenas valores maiores ou iguais a 0')
+        except ValueError:
+            print('❌ Digite apenas numerais')            
+            
+
+
+
 
 # ==========================================
 # ZONA 3: FLUXOS / ORQUESTRAÇÃO
