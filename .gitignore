@@ -1,2 +1,5 @@
 *.csv
 !example.csv 
+checklist.md
+#*.json
+#!config.json
