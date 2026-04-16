@@ -1,0 +1,15 @@
+{
+  "veiculos_index": {
+    "Royal Enfield Himalayan 411": "veiculos/himalayan_22.json",
+    "Toyota Etios": "veiculos/etios_16.json"
+  },
+  "categorias_menu": [
+    "Abastecimento",
+    "Manutenção Preventiva",
+    "Acessórios / Upgrades",
+    "Manutenção Corretiva",
+    "Burocracia",
+    "Alterar Veículo",
+    "Alterar Data"
+  ]
+}
