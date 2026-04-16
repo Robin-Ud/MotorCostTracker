@@ -8,6 +8,20 @@
     "oleo_motor": "Ciclos frio-quente degradam óleo mesmo sem km alta. Mantido intervalo sugerido de 5.000km, mas o tempo (6 meses) frequentemente vai disparar antes.",
     "corrente": "Poeira urbana e calor do asfalto ressecam a corrente rápido mesmo em trajetos curtos."
   },
+  "nomes_display": {
+    "limpar_lubrificar_corrente": "Lubrif. corrente",
+    "verificar_esticar_corrente": "Esticar corrente",
+    "lubrificar_alavancas_e_articulacoes": "Alavancas/articulações",
+    "inspecionar_filtro_ar": "Filtro de ar",
+    "ajustar_valvulas": "Válvulas",
+    "lubrificar_cabos_acelerador_embreagem": "Cabos acel./embreagem",
+    "trocar_oleo_e_filtro": "Óleo e filtro",
+    "limpar_corpo_borboleta": "Corpo borboleta",
+    "trocar_vela_ignicao": "Vela de ignição",
+    "trocar_fluido_freios": "Fluido de freios",
+    "trocar_oleo_suspensao": "Óleo da suspensão",
+    "calibrar_pneus": "Calibrar pneus"
+  },
   "manutencoes": {
     "por_quilometragem": {
       "limpar_lubrificar_corrente": 500,

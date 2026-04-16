@@ -1,6 +1,15 @@
 {
   "veiculo": "Toyota Etios",
   "ano": 2016,
+  "nomes_display": {
+    "trocar_oleo_e_filtro": "Óleo e filtro",
+    "trocar_filtro_ar_motor": "Filtro de ar",
+    "trocar_filtro_habitaculo": "Filtro do habitáculo",
+    "alinhar_e_balancear_rodas": "Alinhamento/balanceamento",
+    "trocar_fluido_freios": "Fluido de freios",
+    "trocar_liquido_refrigeracao": "Líq. arrefecimento",
+    "calibrar_pneus": "Calibrar pneus"
+  },
   "manutencoes": {
     "por_quilometragem": {
       "trocar_oleo_e_filtro": 10000,

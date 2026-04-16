@@ -3,6 +3,12 @@
     "Royal Enfield Himalayan 411": "veiculos/himalayan_22.json",
     "Toyota Etios": "veiculos/etios_16.json"
   },
+  "combustiveis": [
+    "gasolina_comum",
+    "gasolina_aditivada",
+    "etanol",
+    "diesel"
+  ],
   "categorias_menu": [
     "Abastecimento",
     "Manutenção Preventiva",
