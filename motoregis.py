@@ -26,6 +26,28 @@ from datetime import datetime
 # Funções burras. Elas só leem e escrevem, não tomam decisões.
 # ==========================================
 
+def json_to_dict(caminho):
+    dictbuffer = {}
+    try:
+        with open(caminho, 'r') as arquivo:
+            dictbuffer = json.load(arquivo)
+        return dictbuffer 
+
+    except FileNotFoundError:
+        return 0
+    except json.JSONDecodeError:
+        return 0
+
+def gets_data(caminho)
+    """
+    essa função tem como objetivo receber um caminho de um arquivo csv e retornar uma matriz desse csv
+    """
+    matriz = []
+    with open(caminho, 'r', encoding= 'utf-8') as file:
+        matriz = [linha.strip().split(',') for linha in file.readlines() if linha.strip() != ""]
+    return matriz
+
+
 # ==========================================
 # ZONA 2: VALIDADORES (As fundações)
 # Garantem que o usuário não digite letras onde vai número, etc.
