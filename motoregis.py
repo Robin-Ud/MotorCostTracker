@@ -17,8 +17,11 @@ Licença: GNU GPLv3
 
 import csv
 import json
+import os
 import subprocess
 from datetime import datetime
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 # ==========================================
@@ -28,28 +31,28 @@ from datetime import datetime
 
 def json_to_dict(caminho):
     try:
-        with open(caminho, 'r') as f:
+        with open(os.path.join(BASE_DIR, caminho), 'r') as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         return None
 
 def gets_data(caminho):
     try:
-        with open(caminho, 'r', encoding='utf-8') as f:
+        with open(os.path.join(BASE_DIR, caminho), 'r', encoding='utf-8') as f:
             return [linha.strip().split(',') for linha in f if linha.strip()]
     except FileNotFoundError:
         return []
 
 def save_record(caminho, registro):
-    with open(caminho, 'a', newline='', encoding='utf-8') as f:
+    with open(os.path.join(BASE_DIR, caminho), 'a', newline='', encoding='utf-8') as f:
         csv.writer(f).writerow(registro)
 
 def git_sync(csv_path, veiculo_nome, data_str, odometro):
     msg = f"registro: {veiculo_nome} | {data_str} | {odometro}km"
-    subprocess.run(['git', 'add', csv_path], capture_output=True)
-    result = subprocess.run(['git', 'commit', '-m', msg], capture_output=True, text=True)
+    subprocess.run(['git', '-C', BASE_DIR, 'add', csv_path], capture_output=True)
+    result = subprocess.run(['git', '-C', BASE_DIR, 'commit', '-m', msg], capture_output=True, text=True)
     if result.returncode == 0:
-        subprocess.run(['git', 'push'], capture_output=True)
+        subprocess.run(['git', '-C', BASE_DIR, 'push'], capture_output=True)
 
 
 # ==========================================
