@@ -1,129 +1,142 @@
-# MotoRegis 🏍️
+# MotoRegis
 
-Um sistema minimalista via linha de comando (CLI) (inicialmente) para registro de abastecimentos, manutenções e customizações de motores. Desenvolvido com foco em velocidade, **baixa fricção** e na filosofia KISS (*Keep It Simple, Stupid*).
+A minimalist command-line tool for tracking vehicle fuel, maintenance, and costs. Zero dependencies — pure Python standard library.
 
-Pensado para uso rápido em cotidiano via Termux, com os dados sendo versionados via Git para análises posteriores no PC (inicialmente).
-
----
-
-## 🧠 Filosofia e Arquitetura
-
-O projeto é estritamente dividido para manter a simplicidade e a segurança dos dados:
-* **Interface e Lógica:** Script em Python puro.
-* **Armazenamento:** Arquivo `.csv` (agnóstico e perfeito para análise de dados).
-* **Configuração:** Arquivo `.json` estritamente **somente leitura** pelo script.
-* **Manutenção das configurações:** Script em Python puro dedicado a isso ou manualmente.
+[![CI](https://github.com/Robin-Ud/MotorCostTracker/actions/workflows/ci.yml/badge.svg)](https://github.com/Robin-Ud/MotorCostTracker/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 ---
 
-## ⚙️ Configuração
+## What it does
 
-Para evitar acidentes e simplificar o código, o script de acesso ao usuário não altera as configurações. A mudança de configurações deve ser realizada manualmente ou via script dedicado guardado em uma pasta oculta.
+MotoRegis logs vehicle events to a plain CSV file — fuel fills, scheduled maintenance, accessories, corrective repairs, and bureaucracy (taxes, licensing). After each entry it checks whether any maintenance item is overdue by mileage, months, or days, and alerts you immediately.
 
-**Exemplo de configs.json:**
+Data lives in `~/.motoregis/` and is never locked into a proprietary format. Bring your own analysis tool (pandas, Excel, anything).
+
+---
+
+## Install
+
+```bash
+pip install motoregis
+```
+
+Then run:
+
+```bash
+motoregis
+```
+
+---
+
+## First-time setup
+
+MotoRegis stores your configuration and data in `~/.motoregis/`. On first run, if no config is found, the tool will print setup instructions.
+
+```bash
+# 1. Create the data directory
+mkdir -p ~/.motoregis/veiculos
+
+# 2. Copy the example config and edit it
+cp configs.example.json ~/.motoregis/configs.json
+
+# 3. Copy the example vehicle config and edit it
+cp veiculos/example_vehicle.json ~/.motoregis/veiculos/my_vehicle.json
+```
+
+Edit `~/.motoregis/configs.json` to point to your vehicle file:
+
 ```json
 {
   "veiculos_index": {
-    "Royal Enfield Himalayan 411": "veiculos/himalayan_22.json",
-    "Toyota Etios": "veiculos/etios_16.json"
+    "My Motorcycle": "veiculos/my_vehicle.json"
   },
+  "combustiveis": ["gasoline", "premium", "ethanol"],
   "categorias_menu": [
-    "Abastecimento",
-    "Manutenção Preventiva",
-    "Acessórios / Upgrades",
-    "Manutenção Corretiva",
-    "Burocracia",
-    "Alterar Veículo",
-    "Alterar Data"
-  ]
+    "Fuel", "Scheduled Maintenance", "Accessories / Upgrades",
+    "Corrective Maintenance", "Bureaucracy", "Change Vehicle", "Change Date"
+  ],
+  "git_sync": false
 }
 ```
 
----
-
-## 🗃️ Estrutura de Dados (O CSV)
-
-Todos os registros são salvos no arquivo configurado, seguindo a estrutura de colunas abaixo. Isso garante que a importação via Pandas ou outras ferramentas de análise seja direta.
-
-| Coluna | Tipo | Descrição | Exemplo |
-| :--- | :--- | :--- | :--- |
-| `data` | String | Data do registro | 2026-04-14 |
-| `moto` | String | Identificador da moto (puxado do config) | Himalayan 411 |
-| `odometro` | Int | Quilometragem atual | 15400 |
-| `tipo` | Int | Categoria do gasto (1: Abast, 2: Manut_Prev, 3: Acessorios, 4: Manut_Cor, 5: Buro) | 1 |
-| `valor_gasto`| Float | Custo total da operação em Reais | 85.50 |
-| `detalhes` | String | Litros, peça trocada ou local | oleo_motor |
-| `litros` | Float | total em L abastecidos | 14.2 |
+Set `"git_sync": true` if you want automatic git commit and push after each record (requires `~/.motoregis/` to be a git repository).
 
 ---
 
-## 🚀 Como Usar
+## Vehicle config
 
-1. Execute o script no terminal:
-   ```bash
-   python3 motoregis.py
-   ```
-2. Verifique se o registro de interesse corresponde à moto e à data apresentadas inicialmente pelo script.
-3. Siga o menu interativo:
-   * `1` - Abastecimento
-   * `2` - Manutenção Preventiva
-   * `3` - Acessórios / Upgrades
-   * `4` - Manutenção Corretiva
-   * `5` - Burocracia
-   * `6` - Alterar Veículo
-   * `7` - Alterar Data
-4. Sincronize via Git caso tenha internet.
+Each vehicle has its own JSON file defining maintenance intervals:
 
----
-
-## 📊 Fluxo de Funcionamento
-
-```mermaid
-graph TD
-    %% Definição do Início
-    Start[Início do Código<br>Mostra Moto e Data Selecionadas] --> Menu{Menu Principal}
-
-    %% Opções do Menu
-    Menu -->|1| Abast(Abastecimento)
-    Menu -->|2| ManutP(Manutenção Preventiva)
-    Menu -->|3| Acess(Acessórios / Upgrades)
-    Menu -->|4| ManutS(Manutenção Corretiva)
-    Menu -->|5| Buro(Burocracia)
-    Menu -->|6| MudarV(Alterar Veículo)
-    Menu -->|7| MudarD(Alterar Data)
-
-    %% Loops de alteração
-    MudarV -->|Muda a Moto| Start
-    MudarD -->|Muda a Data| Start
-
-    %% Gargalo do Odômetro e Valor (DRY)
-    Abast --> Odo[Cap Odômetro]
-    ManutP --> Odo
-    Acess --> Odo
-    ManutS --> Odo
-
-    Odo --> Valor[Cap Valor]
-
-    %% Ramificações Específicas
-    Valor -->|Se 1| Litros[Cap Litros]
-    Valor -->|Se 2,4,5| Opcao[Cap Opção Restrita]
-    Valor -->|Se 3| Txt1[Cap Texto Livre]
-
-    %% Fechamento
-    Litros --> Salvar[Salva no CSV Correspondente]
-    Opcao --> Salvar
-    Txt1 --> Salvar
-
-    Salvar --> Alertas[Avisa se há manutenção atrasada]
-    Alertas --> Fim[Imprime Sucesso e Sincroniza via Git]
+```json
+{
+  "veiculo": "My Motorcycle",
+  "ano": 2022,
+  "nomes_display": {
+    "oil_change": "Oil & filter",
+    "tire_pressure": "Tire pressure"
+  },
+  "manutencoes": {
+    "por_quilometragem": {
+      "oil_change": 5000
+    },
+    "por_tempo_meses": {
+      "oil_change": 6
+    },
+    "por_tempo_dias": {
+      "tire_pressure": 15
+    }
+  }
+}
 ```
 
+Keys in `nomes_display` map internal identifiers to human-readable labels shown in the menu and alerts. All three interval types (`por_quilometragem`, `por_tempo_meses`, `por_tempo_dias`) are optional.
+
 ---
 
-## 🗺️ Roadmap e Ideias Futuras
+## CSV schema
 
-- [x] **Validadores Robustos:** Funções isoladas para captura de inteiros (`select_index`) e decimais (`get_float`) com tratamento de erros implementadas.
-- [ ] **Validador de Odômetro:** Impedir entrada de quilometragem menor que a última registrada.
-- [ ] **Sync Automático:** Integrar comandos do Git diretamente no Python para fazer *commit* e *push* silenciosos após cada novo registro.
-- [ ] **Evolução da Interface:** A lógica de validação e I/O de dados está isolada. No futuro, avaliar a migração da CLI atual para uma TUI (ex: Textual/Rich) ou uma GUI Mobile (Flet), mantendo o mesmo arquivo CSV como base.
-- [ ] **Análise dos dados:** Geradas no próprio celular caso migre pra TUI ou GUI, ou somente no computador caso siga apenas via linha de comando.
+All records are appended to `~/.motoregis/veiculos/<vehicle>.csv`:
+
+| Column | Type | Description | Example |
+|---|---|---|---|
+| `date` | String | Record date (YYYY-MM-DD) | 2026-04-17 |
+| `odometer` | Int | Current odometer reading (km) | 15400 |
+| `category` | Int | 1=Fuel, 2=Scheduled, 3=Accessories, 4=Corrective, 5=Bureaucracy | 1 |
+| `cost` | Float | Total cost | 85.50 |
+| `liters` | Float | Liters filled (fuel entries only, else 0.00) | 14.20 |
+| `details` | String | Fuel type or maintenance identifier | oil_change |
+
+---
+
+## Architecture
+
+The source is organized into four zones, all in `motoregis.py`:
+
+| Zone | Responsibility |
+|---|---|
+| Zone 1 — Data engines | `load_json`, `read_csv`, `append_record`, `git_sync` — pure I/O, no logic |
+| Zone 2 — Validators | `get_int`, `get_float`, `select_index` — isolated from business logic |
+| Zone 3 — Orchestration | maintenance checks, odometer prompts, record flows |
+| Zone 4 — Interface | main menu loop |
+
+This separation means the CLI layer can be replaced with a TUI or GUI without touching the data or business logic.
+
+---
+
+## Contributing
+
+```bash
+git clone https://github.com/Robin-Ud/MotorCostTracker
+cd MotorCostTracker
+pip install -e .
+pip install pytest
+pytest tests/ -v
+```
+
+Code style:
+- PEP 8
+- Type hints required on all new functions
+- No external dependencies — stdlib only
+- Commit messages follow `feat:`, `fix:`, `chore:` convention
