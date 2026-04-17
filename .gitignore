@@ -1,5 +1,12 @@
-veiculos/example.csv
 checklist.md
-#*.json
-#!config.json
 *pycache*
+__pycache__/
+*.pyc
+
+# Personal vehicle data — never commit
+veiculos/*.csv
+veiculos/*.json
+!veiculos/example.csv
+!veiculos/example_vehicle.json
+configs.json
+!configs.example.json
