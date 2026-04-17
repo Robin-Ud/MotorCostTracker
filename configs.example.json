@@ -1,0 +1,21 @@
+{
+  "veiculos_index": {
+    "My Vehicle": "veiculos/my_vehicle.json"
+  },
+  "combustiveis": [
+    "gasoline",
+    "premium_gasoline",
+    "ethanol",
+    "diesel"
+  ],
+  "categorias_menu": [
+    "Fuel",
+    "Scheduled Maintenance",
+    "Accessories / Upgrades",
+    "Corrective Maintenance",
+    "Bureaucracy",
+    "Change Vehicle",
+    "Change Date"
+  ],
+  "git_sync": false
+}
