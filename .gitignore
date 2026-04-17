@@ -1,5 +1,5 @@
-*.csv
-!example.csv 
+veiculos/example.csv
 checklist.md
 #*.json
 #!config.json
+*pycache*
