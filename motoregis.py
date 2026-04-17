@@ -1,17 +1,15 @@
 """
-MotoRegis - Motor Cost Tracker
+MotoRegis — Vehicle Cost Tracker
 ---------------------------------------------------------
-Manifesto de Desenvolvimento:
-1. KISS (Keep It Simple, Stupid): Priorize a simplicidade.
-   Se uma lógica pode ser resolvida com menos linhas e menos pacotes, faça-o.
-2. DRY (Don't Repeat Yourself): Funções de captura e validação devem ser genéricas.
-3. Baixa Fricção: O fluxo deve ser otimizado para uso rápido via Termux.
-4. Portabilidade: Dados em CSV para garantir que o usuário seja dono da informação.
-5. Agnosticismo de Interface: A lógica de validação deve ser isolada da captura
-   de input, facilitando futura migração para TUI/GUI.
+Design principles:
+1. KISS (Keep It Simple, Stupid): Prefer fewer lines and no unnecessary packages.
+2. DRY (Don't Repeat Yourself): Input capture and validation functions are generic.
+3. Low friction: Optimized for fast daily use in a terminal environment.
+4. Portability: Data stored in CSV so the user owns their information.
+5. Interface agnosticism: Validation logic is isolated from input capture,
+   enabling future migration to TUI/GUI.
 
-Desenvolvido por: @Robin-Ud
-Licença: GNU GPLv3
+License: GNU GPLv3
 ---------------------------------------------------------
 """
 
@@ -21,109 +19,114 @@ import os
 import subprocess
 from datetime import datetime
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(os.path.expanduser("~"), ".motoregis")
 
 
 # ==========================================
-# ZONA 1: MOTORES DE DADOS (JSON e CSV)
-# Funções burras. Elas só leem e escrevem, não tomam decisões.
+# ZONE 1: DATA ENGINES (JSON and CSV)
+# Dumb functions. They only read and write, they don't make decisions.
 # ==========================================
 
-def json_to_dict(caminho):
+def load_json(path: str) -> dict | None:
     try:
-        with open(os.path.join(BASE_DIR, caminho), 'r') as f:
+        with open(os.path.join(DATA_DIR, path), 'r') as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         return None
 
-def gets_data(caminho):
+def read_csv(path: str) -> list[list[str]]:
     try:
-        with open(os.path.join(BASE_DIR, caminho), 'r', encoding='utf-8') as f:
-            return [linha.strip().split(',') for linha in f if linha.strip()]
+        with open(os.path.join(DATA_DIR, path), 'r', encoding='utf-8') as f:
+            return [row.strip().split(',') for row in f if row.strip()]
     except FileNotFoundError:
         return []
 
-def save_record(caminho, registro):
-    with open(os.path.join(BASE_DIR, caminho), 'a', newline='', encoding='utf-8') as f:
-        csv.writer(f).writerow(registro)
+def append_record(path: str, row: list) -> None:
+    with open(os.path.join(DATA_DIR, path), 'a', newline='', encoding='utf-8') as f:
+        csv.writer(f).writerow(row)
 
-def git_sync(csv_path, veiculo_nome, data_str, odometro):
-    msg = f"registro: {veiculo_nome} | {data_str} | {odometro}km"
-    subprocess.run(['git', '-C', BASE_DIR, 'add', csv_path], capture_output=True)
-    result = subprocess.run(['git', '-C', BASE_DIR, 'commit', '-m', msg], capture_output=True, text=True)
+def git_sync(csv_path: str, vehicle_name: str, date_str: str, odometer: int) -> None:
+    msg = f"record: {vehicle_name} | {date_str} | {odometer}km"
+    subprocess.run(['git', '-C', DATA_DIR, 'add', csv_path], capture_output=True)
+    result = subprocess.run(['git', '-C', DATA_DIR, 'commit', '-m', msg], capture_output=True, text=True)
     if result.returncode == 0:
-        subprocess.run(['git', '-C', BASE_DIR, 'push'], capture_output=True)
+        subprocess.run(['git', '-C', DATA_DIR, 'push'], capture_output=True)
 
 
 # ==========================================
-# ZONA 2: VALIDADORES (As fundações)
-# Garantem que o usuário não digite letras onde vai número, etc.
+# ZONE 2: VALIDATORS
+# Ensure the user doesn't type text where a number is expected, etc.
 # ==========================================
 
-def select_index(msg, range_max):
+def select_index(prompt: str, max_value: int) -> int:
     while True:
         try:
-            valor = int(input(msg))
-            if valor in range(0, range_max + 1):
-                return valor
-            print(f'❌ Digite apenas valores de 0 a {range_max}')
+            value = int(input(prompt))
+            if value in range(0, max_value + 1):
+                return value
+            print(f'❌ Enter a value between 0 and {max_value}')
         except ValueError:
-            print('❌ Por favor, digite apenas números inteiros')
+            print('❌ Please enter an integer')
 
-def get_float(msg):
+def get_float(prompt: str) -> float:
     while True:
-        entrada = input(msg).strip().replace(',', '.')
+        entry = input(prompt).strip().replace(',', '.')
         try:
-            valor = float(entrada)
-            if valor >= 0:
-                return valor
-            print('❌ Digite apenas valores maiores ou iguais a 0')
+            value = float(entry)
+            if value >= 0:
+                return value
+            print('❌ Enter a value greater than or equal to 0')
         except ValueError:
-            print('❌ Digite apenas numerais')
+            print('❌ Numbers only')
 
-def get_int(msg):
+def get_int(prompt: str) -> int:
     while True:
         try:
-            valor = int(input(msg).strip())
-            if valor >= 0:
-                return valor
-            print('❌ Digite apenas valores maiores ou iguais a 0')
+            value = int(input(prompt).strip())
+            if value >= 0:
+                return value
+            print('❌ Enter a value greater than or equal to 0')
         except ValueError:
-            print('❌ Por favor, digite apenas números inteiros')
+            print('❌ Please enter an integer')
 
 
 # ==========================================
-# ZONA 3: FLUXOS / ORQUESTRAÇÃO
-# Juntam as validações e mandam salvar nos motores.
+# ZONE 3: ORCHESTRATION
+# Combine validators and route data to the engines.
 # ==========================================
 
-def legivel(chave, veiculo=None):
-    if veiculo and 'nomes_display' in veiculo:
-        return veiculo['nomes_display'].get(chave, ' '.join(chave.split('_')).capitalize())
-    return ' '.join(chave.split('_')).capitalize()
+def display_name(key: str, vehicle: dict | None = None) -> str:
+    if vehicle and 'nomes_display' in vehicle:
+        return vehicle['nomes_display'].get(key, ' '.join(key.split('_')).capitalize())
+    return ' '.join(key.split('_')).capitalize()
 
-def load_config():
-    config = json_to_dict('configs.json')
+def load_config() -> dict:
+    config = load_json('configs.json')
     if config is None:
-        print("❌ Erro: configs.json não encontrado.")
+        print("❌ Error: configs.json not found.")
+        print(f"\nFirst-time setup:")
+        print(f"  1. Create the data directory:  mkdir -p ~/.motoregis/veiculos")
+        print(f"  2. Copy the example config:    cp configs.example.json ~/.motoregis/configs.json")
+        print(f"  3. Copy the example vehicle:   cp veiculos/example_vehicle.json ~/.motoregis/veiculos/")
+        print(f"  4. Edit both files with your vehicle's details.")
         exit(1)
     return config
 
-def select_veiculo(config):
-    veiculos = list(config['veiculos_index'].keys())
-    print("\n=== Selecionar Veículo ===")
-    for i, nome in enumerate(veiculos, 1):
-        print(f"  {i}. {nome}")
-    print("  0. Cancelar")
-    idx = select_index("Veículo: ", len(veiculos))
+def select_vehicle(config: dict) -> tuple[str | None, str | None, str | None]:
+    vehicles = list(config['veiculos_index'].keys())
+    print("\n=== Select Vehicle ===")
+    for i, name in enumerate(vehicles, 1):
+        print(f"  {i}. {name}")
+    print("  0. Cancel")
+    idx = select_index("Vehicle: ", len(vehicles))
     if idx == 0:
         return None, None, None
-    nome = veiculos[idx - 1]
-    json_path = config['veiculos_index'][nome]
-    return nome, json_path, json_path.replace('.json', '.csv')
+    name = vehicles[idx - 1]
+    json_path = config['veiculos_index'][name]
+    return name, json_path, json_path.replace('.json', '.csv')
 
-def get_last_odometer(csv_path):
-    data = gets_data(csv_path)
+def get_last_odometer(path: str) -> int:
+    data = read_csv(path)
     if len(data) <= 1:
         return 0
     try:
@@ -131,176 +134,177 @@ def get_last_odometer(csv_path):
     except (IndexError, ValueError):
         return 0
 
-def get_last_fuel_record(csv_path):
-    data = gets_data(csv_path)
-    for linha in reversed(data[1:]):
+def get_last_fuel_record(path: str) -> tuple[int | None, float | None]:
+    data = read_csv(path)
+    for row in reversed(data[1:]):
         try:
-            if linha[2] == '1' and float(linha[4]) > 0:
-                return int(linha[1]), float(linha[4])
+            if row[2] == '1' and float(row[4]) > 0:
+                return int(row[1]), float(row[4])
         except (IndexError, ValueError):
             continue
     return None, None
 
-def check_manutencoes(csv_path, json_path, odometro_atual, data_atual):
-    veiculo = json_to_dict(json_path)
-    if veiculo is None:
+def check_maintenance(csv_path: str, json_path: str, current_odometer: int, current_date: str) -> None:
+    vehicle = load_json(json_path)
+    if vehicle is None:
         return
 
-    data = gets_data(csv_path)
+    data = read_csv(csv_path)
     if len(data) <= 1:
         return
 
-    manutencoes = veiculo.get('manutencoes', {})
-    data_atual_dt = datetime.strptime(data_atual, '%Y-%m-%d')
-    primeira_data = datetime.strptime(data[1][0], '%Y-%m-%d')
-    primeiro_odo = int(data[1][1])
-    alertas = []
+    maintenance = vehicle.get('manutencoes', {})
+    current_date_dt = datetime.strptime(current_date, '%Y-%m-%d')
+    first_date = datetime.strptime(data[1][0], '%Y-%m-%d')
+    first_odometer = int(data[1][1])
+    alerts = []
 
-    def last_manutencao(nome):
-        for linha in reversed(data[1:]):
-            if linha[2] == '2' and linha[5] == nome:
-                return linha
+    def last_maintenance(name: str) -> list | None:
+        for row in reversed(data[1:]):
+            if row[2] == '2' and row[5] == name:
+                return row
         return None
 
-    for nome, intervalo in manutencoes.get('por_quilometragem', {}).items():
-        ultimo = last_manutencao(nome)
-        ref_odo = int(ultimo[1]) if ultimo else primeiro_odo
-        km_desde = odometro_atual - ref_odo
-        if km_desde >= intervalo:
-            alertas.append((legivel(nome, veiculo), f"{km_desde} km atrás ({intervalo} km)"))
+    for name, interval in maintenance.get('por_quilometragem', {}).items():
+        last = last_maintenance(name)
+        ref_odometer = int(last[1]) if last else first_odometer
+        km_since = current_odometer - ref_odometer
+        if km_since >= interval:
+            alerts.append((display_name(name, vehicle), f"{km_since} km ago ({interval} km)"))
 
-    for nome, meses in manutencoes.get('por_tempo_meses', {}).items():
-        ultimo = last_manutencao(nome)
-        ref_dt = datetime.strptime(ultimo[0], '%Y-%m-%d') if ultimo else primeira_data
-        delta_meses = (data_atual_dt.year - ref_dt.year) * 12 + (data_atual_dt.month - ref_dt.month)
-        if delta_meses >= meses:
-            alertas.append((legivel(nome, veiculo), f"{delta_meses} meses atrás ({meses} meses)"))
+    for name, months in maintenance.get('por_tempo_meses', {}).items():
+        last = last_maintenance(name)
+        ref_date = datetime.strptime(last[0], '%Y-%m-%d') if last else first_date
+        delta_months = (current_date_dt.year - ref_date.year) * 12 + (current_date_dt.month - ref_date.month)
+        if delta_months >= months:
+            alerts.append((display_name(name, vehicle), f"{delta_months} months ago ({months} months)"))
 
-    for nome, dias in manutencoes.get('por_tempo_dias', {}).items():
-        ultimo = last_manutencao(nome)
-        ref_dt = datetime.strptime(ultimo[0], '%Y-%m-%d') if ultimo else primeira_data
-        delta_dias = (data_atual_dt - ref_dt).days
-        if delta_dias >= dias:
-            alertas.append((legivel(nome, veiculo), f"{delta_dias} dias atrás ({dias} dias)"))
+    for name, days in maintenance.get('por_tempo_dias', {}).items():
+        last = last_maintenance(name)
+        ref_date = datetime.strptime(last[0], '%Y-%m-%d') if last else first_date
+        delta_days = (current_date_dt - ref_date).days
+        if delta_days >= days:
+            alerts.append((display_name(name, vehicle), f"{delta_days} days ago ({days} days)"))
 
-    if alertas:
-        print("\n--- Manutenções pendentes ---\n")
-        for nome_display, info in alertas:
-            print(f"  ⚠️  {nome_display}")
+    if alerts:
+        print("\n--- Pending maintenance ---\n")
+        for name_display, info in alerts:
+            print(f"  ⚠️  {name_display}")
             print(f"      {info}")
         print()
 
-def captura_odometro(csv_path):
-    ultimo_km = get_last_odometer(csv_path)
-    print(f"  Último odômetro: {ultimo_km} km")
+def prompt_odometer(path: str) -> int:
+    last_km = get_last_odometer(path)
+    print(f"  Last odometer: {last_km} km")
     while True:
-        odometro = get_int("  Odômetro atual (km): ")
-        if odometro >= ultimo_km:
-            return odometro
-        print(f"❌ Odômetro não pode ser menor que o último registro ({ultimo_km} km)")
+        odometer = get_int("  Current odometer (km): ")
+        if odometer >= last_km:
+            return odometer
+        print(f"❌ Odometer cannot be lower than the last record ({last_km} km)")
 
-def _finalizar(csv_path, json_path, veiculo_nome, data_str, odometro):
-    check_manutencoes(csv_path, json_path, odometro, data_str)
-    git_sync(csv_path, veiculo_nome, data_str, odometro)
-    print("\n✅ Sincronizado!")
+def _finalize(csv_path: str, json_path: str, vehicle_name: str, date_str: str, odometer: int, config: dict) -> None:
+    check_maintenance(csv_path, json_path, odometer, date_str)
+    if config.get('git_sync', False):
+        git_sync(csv_path, vehicle_name, date_str, odometer)
+    print("\n✅ Saved!")
 
-def captura_abastecimento(csv_path, json_path, veiculo_nome, data_str, config):
-    print("\n--- Abastecimento ---")
-    ultimo_odo, _ = get_last_fuel_record(csv_path)
-    odometro = captura_odometro(csv_path)
-    custo = get_float("  Custo total (R$): ")
-    litros = get_float("  Litros: ")
-
-    print()
-    combustiveis = config['combustiveis']
-    for i, c in enumerate(combustiveis, 1):
-        print(f"  {i}. {c}")
-    idx = select_index("  Combustível: ", len(combustiveis))
-    detalhes = combustiveis[idx - 1] if idx > 0 else "outro"
-
-    save_record(csv_path, [data_str, odometro, 1, f"{custo:.2f}", f"{litros:.2f}", detalhes])
-
-    if ultimo_odo and litros > 0:
-        km_percorridos = odometro - ultimo_odo
-        print(f"\n  Consumo: {km_percorridos / litros:.2f} km/L ({km_percorridos} km / {litros} L)")
-
-    _finalizar(csv_path, json_path, veiculo_nome, data_str, odometro)
-
-def captura_manutencao_periodica(csv_path, json_path, veiculo_nome, data_str):
-    print("\n--- Manutenção Periódica ---")
-    veiculo = json_to_dict(json_path)
-    opcoes = list(veiculo.get('manutencoes', {}).get('por_quilometragem', {}).keys())
+def record_fuel(csv_path: str, json_path: str, vehicle_name: str, date_str: str, config: dict) -> None:
+    print("\n--- Fuel ---")
+    last_odo, _ = get_last_fuel_record(csv_path)
+    odometer = prompt_odometer(csv_path)
+    cost = get_float("  Total cost: ")
+    liters = get_float("  Liters: ")
 
     print()
-    for i, nome in enumerate(opcoes, 1):
-        print(f"  {i:2}. {legivel(nome, veiculo)}")
-    print("   0. Outro")
+    fuel_types = config['combustiveis']
+    for i, ft in enumerate(fuel_types, 1):
+        print(f"  {i}. {ft}")
+    idx = select_index("  Fuel type: ", len(fuel_types))
+    details = fuel_types[idx - 1] if idx > 0 else "other"
+
+    append_record(csv_path, [date_str, odometer, 1, f"{cost:.2f}", f"{liters:.2f}", details])
+
+    if last_odo and liters > 0:
+        km_driven = odometer - last_odo
+        print(f"\n  Consumption: {km_driven / liters:.2f} km/L ({km_driven} km / {liters} L)")
+
+    _finalize(csv_path, json_path, vehicle_name, date_str, odometer, config)
+
+def record_scheduled_maintenance(csv_path: str, json_path: str, vehicle_name: str, date_str: str, config: dict) -> None:
+    print("\n--- Scheduled Maintenance ---")
+    vehicle = load_json(json_path)
+    options = list(vehicle.get('manutencoes', {}).get('por_quilometragem', {}).keys())
+
     print()
-    idx = select_index("Manutenção: ", len(opcoes))
-    detalhes = input("  Descreva: ").strip().replace(' ', '_').lower() if idx == 0 else opcoes[idx - 1]
+    for i, name in enumerate(options, 1):
+        print(f"  {i:2}. {display_name(name, vehicle)}")
+    print("   0. Other")
+    print()
+    idx = select_index("Maintenance: ", len(options))
+    details = input("  Describe: ").strip().replace(' ', '_').lower() if idx == 0 else options[idx - 1]
 
-    odometro = captura_odometro(csv_path)
-    custo = get_float("  Custo (R$): ")
+    odometer = prompt_odometer(csv_path)
+    cost = get_float("  Cost: ")
 
-    save_record(csv_path, [data_str, odometro, 2, f"{custo:.2f}", "0.00", detalhes])
-    _finalizar(csv_path, json_path, veiculo_nome, data_str, odometro)
+    append_record(csv_path, [date_str, odometer, 2, f"{cost:.2f}", "0.00", details])
+    _finalize(csv_path, json_path, vehicle_name, date_str, odometer, config)
 
-def captura_generica(csv_path, json_path, veiculo_nome, categoria_idx, categoria_nome, data_str):
-    print(f"\n--- {categoria_nome} ---\n")
-    odometro = captura_odometro(csv_path)
-    custo = get_float("  Custo (R$): ")
-    detalhes = input("  Detalhes: ").strip().replace(' ', '_').lower()
+def record_generic(csv_path: str, json_path: str, vehicle_name: str, category_idx: int, category_name: str, date_str: str, config: dict) -> None:
+    print(f"\n--- {category_name} ---\n")
+    odometer = prompt_odometer(csv_path)
+    cost = get_float("  Cost: ")
+    details = input("  Details: ").strip().replace(' ', '_').lower()
 
-    save_record(csv_path, [data_str, odometro, categoria_idx, f"{custo:.2f}", "0.00", detalhes])
-    _finalizar(csv_path, json_path, veiculo_nome, data_str, odometro)
+    append_record(csv_path, [date_str, odometer, category_idx, f"{cost:.2f}", "0.00", details])
+    _finalize(csv_path, json_path, vehicle_name, date_str, odometer, config)
 
 
 # ==========================================
-# ZONA 4: INTERFACE (O Menu Principal)
-# Onde o script começa a rodar de verdade.
+# ZONE 4: INTERFACE (Main Menu)
+# Entry point where the script starts running.
 # ==========================================
 
-def main():
+def main() -> None:
     config = load_config()
-    categorias = config['categorias_menu']
-    veiculos = list(config['veiculos_index'].keys())
+    categories = config['categorias_menu']
+    vehicles = list(config['veiculos_index'].keys())
 
-    veiculo_nome = veiculos[0]
-    json_path = config['veiculos_index'][veiculo_nome]
+    vehicle_name = vehicles[0]
+    json_path = config['veiculos_index'][vehicle_name]
     csv_path = json_path.replace('.json', '.csv')
-    data_atual = datetime.now().strftime('%Y-%m-%d')
+    current_date = datetime.now().strftime('%Y-%m-%d')
 
     while True:
-        print(f"\n[ {veiculo_nome} | {data_atual} ]")
-        for i, cat in enumerate(categorias, 1):
+        print(f"\n[ {vehicle_name} | {current_date} ]")
+        for i, cat in enumerate(categories, 1):
             print(f"  {i}. {cat}")
-        print("  0. Sair")
+        print("  0. Exit")
 
-        opcao = select_index("Opção: ", len(categorias))
+        choice = select_index("Option: ", len(categories))
 
-        if opcao == 0:
+        if choice == 0:
             break
-        elif opcao == 1:
-            captura_abastecimento(csv_path, json_path, veiculo_nome, data_atual, config)
+        elif choice == 1:
+            record_fuel(csv_path, json_path, vehicle_name, current_date, config)
             break
-        elif opcao == 2:
-            captura_manutencao_periodica(csv_path, json_path, veiculo_nome, data_atual)
+        elif choice == 2:
+            record_scheduled_maintenance(csv_path, json_path, vehicle_name, current_date, config)
             break
-        elif 3 <= opcao <= 5:
-            captura_generica(csv_path, json_path, veiculo_nome, opcao, categorias[opcao - 1], data_atual)
+        elif 3 <= choice <= 5:
+            record_generic(csv_path, json_path, vehicle_name, choice, categories[choice - 1], current_date, config)
             break
-        elif opcao == 6:
-            novo_nome, novo_json, novo_csv = select_veiculo(config)
-            if novo_nome:
-                veiculo_nome, json_path, csv_path = novo_nome, novo_json, novo_csv
-        elif opcao == 7:
-            nova_data = input(f"  Nova data YYYY-MM-DD [{data_atual}]: ").strip()
-            if nova_data:
+        elif choice == 6:
+            new_name, new_json, new_csv = select_vehicle(config)
+            if new_name:
+                vehicle_name, json_path, csv_path = new_name, new_json, new_csv
+        elif choice == 7:
+            new_date = input(f"  New date YYYY-MM-DD [{current_date}]: ").strip()
+            if new_date:
                 try:
-                    datetime.strptime(nova_data, '%Y-%m-%d')
-                    data_atual = nova_data
+                    datetime.strptime(new_date, '%Y-%m-%d')
+                    current_date = new_date
                 except ValueError:
-                    print("❌ Formato inválido. Use YYYY-MM-DD")
+                    print("❌ Invalid format. Use YYYY-MM-DD")
 
 if __name__ == '__main__':
     main()

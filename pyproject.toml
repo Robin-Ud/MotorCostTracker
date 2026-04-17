@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "motoregis"
+version = "0.1.0"
+description = "A minimalist CLI for tracking vehicle costs, fuel, and maintenance"
+readme = "README.md"
+license = {text = "GPL-3.0-or-later"}
+requires-python = ">=3.10"
+authors = [{name = "Robin-Ud"}]
+keywords = ["vehicle", "maintenance", "fuel", "tracker", "cli"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Utilities",
+]
+
+[project.scripts]
+motoregis = "motoregis:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
