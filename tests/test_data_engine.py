@@ -74,15 +74,17 @@ def test_get_last_fuel_record(tmp_path, monkeypatch):
         "2026-01-15,10500,1,90.00,15.00,gasoline\n"
     )
     monkeypatch.setattr(motoregis, "DATA_DIR", str(tmp_path))
-    odo, liters = motoregis.get_last_fuel_record("data.csv")
+    odo, liters, date = motoregis.get_last_fuel_record("data.csv")
     assert odo == 10500
     assert liters == 15.0
+    assert date == "2026-01-15"
 
 
 def test_get_last_fuel_record_none(tmp_path, monkeypatch):
     p = tmp_path / "data.csv"
     p.write_text("date,odometer,category,cost,liters,details\n")
     monkeypatch.setattr(motoregis, "DATA_DIR", str(tmp_path))
-    odo, liters = motoregis.get_last_fuel_record("data.csv")
+    odo, liters, date = motoregis.get_last_fuel_record("data.csv")
     assert odo is None
     assert liters is None
+    assert date is None

@@ -17,5 +17,7 @@
     "Change Vehicle",
     "Change Date"
   ],
-  "git_sync": false
+  "git_sync": false,
+  "daily_km_threshold": 40,
+  "currency_symbol": ""
 }

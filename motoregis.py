@@ -134,15 +134,15 @@ def get_last_odometer(path: str) -> int:
     except (IndexError, ValueError):
         return 0
 
-def get_last_fuel_record(path: str) -> tuple[int | None, float | None]:
+def get_last_fuel_record(path: str) -> tuple[int | None, float | None, str | None]:
     data = read_csv(path)
     for row in reversed(data[1:]):
         try:
             if row[2] == '1' and float(row[4]) > 0:
-                return int(row[1]), float(row[4])
+                return int(row[1]), float(row[4]), row[0]
         except (IndexError, ValueError):
             continue
-    return None, None
+    return None, None, None
 
 def check_maintenance(csv_path: str, json_path: str, current_odometer: int, current_date: str) -> None:
     vehicle = load_json(json_path)
@@ -210,7 +210,7 @@ def _finalize(csv_path: str, json_path: str, vehicle_name: str, date_str: str, o
 
 def record_fuel(csv_path: str, json_path: str, vehicle_name: str, date_str: str, config: dict) -> None:
     print("\n--- Fuel ---")
-    last_odo, _ = get_last_fuel_record(csv_path)
+    last_odo, _, last_date = get_last_fuel_record(csv_path)
     odometer = prompt_odometer(csv_path)
     cost = get_float("  Total cost: ")
     liters = get_float("  Liters: ")
@@ -226,7 +226,15 @@ def record_fuel(csv_path: str, json_path: str, vehicle_name: str, date_str: str,
 
     if last_odo and liters > 0:
         km_driven = odometer - last_odo
-        print(f"\n  Consumption: {km_driven / liters:.2f} km/L ({km_driven} km / {liters} L)")
+        sym = config.get('currency_symbol', '')
+        print(f"\n  Consumption:  {km_driven / liters:.2f} km/L  ({km_driven} km / {liters:.2f} L)")
+        if km_driven > 0:
+            print(f"  Cost/100km:   {sym}{cost / km_driven * 100:.2f}  ({sym}{cost:.2f} / {km_driven} km)")
+        if last_date:
+            days = (datetime.strptime(date_str, '%Y-%m-%d') - datetime.strptime(last_date, '%Y-%m-%d')).days
+            threshold = config.get('daily_km_threshold', 40)
+            if days > 0 and km_driven / days <= threshold:
+                print(f"  Cost/day:     {sym}{cost / days:.2f}  ({sym}{cost:.2f} / {days} days)")
 
     _finalize(csv_path, json_path, vehicle_name, date_str, odometer, config)
 
