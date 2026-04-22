@@ -1,0 +1,27 @@
+{
+  "veiculo": "My Vehicle Name",
+  "ano": 2020,
+  "nomes_display": {
+    "oil_change": "Oil & filter",
+    "tire_pressure": "Tire pressure",
+    "air_filter": "Air filter",
+    "spark_plug": "Spark plug",
+    "brake_fluid": "Brake fluid"
+  },
+  "manutencoes": {
+    "por_quilometragem": {
+      "oil_change": 5000,
+      "air_filter": 10000,
+      "spark_plug": 20000,
+      "brake_fluid": 30000
+    },
+    "por_tempo_meses": {
+      "oil_change": 6,
+      "air_filter": 12,
+      "brake_fluid": 24
+    },
+    "por_tempo_dias": {
+      "tire_pressure": 15
+    }
+  }
+}

@@ -45,9 +45,23 @@ def append_record(path: str, row: list) -> None:
     with open(os.path.join(DATA_DIR, path), 'a', newline='', encoding='utf-8') as f:
         csv.writer(f).writerow(row)
 
-def git_sync(csv_path: str, vehicle_name: str, date_str: str, odometer: int) -> None:
+def _ensure_gitignore() -> None:
+    path = os.path.join(DATA_DIR, '.gitignore')
+    if not os.path.exists(path):
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write('*\n!*.json\n!*.csv\n!.gitignore\n')
+
+def git_sync(csv_path: str, vehicle_name: str, date_str: str, odometer: int, config: dict) -> None:
+    if not os.path.exists(os.path.join(DATA_DIR, '.git')):
+        subprocess.run(['git', '-C', DATA_DIR, 'init'], capture_output=True)
+    _ensure_gitignore()
+    remote_url = config.get('git_remote', '')
+    if remote_url:
+        has_remote = subprocess.run(['git', '-C', DATA_DIR, 'remote', 'get-url', 'origin'], capture_output=True)
+        if has_remote.returncode != 0:
+            subprocess.run(['git', '-C', DATA_DIR, 'remote', 'add', 'origin', remote_url], capture_output=True)
     msg = f"record: {vehicle_name} | {date_str} | {odometer}km"
-    subprocess.run(['git', '-C', DATA_DIR, 'add', csv_path], capture_output=True)
+    subprocess.run(['git', '-C', DATA_DIR, 'add', '.'], capture_output=True)
     result = subprocess.run(['git', '-C', DATA_DIR, 'commit', '-m', msg], capture_output=True, text=True)
     if result.returncode == 0:
         subprocess.run(['git', '-C', DATA_DIR, 'push'], capture_output=True)
@@ -105,9 +119,9 @@ def load_config() -> dict:
     if config is None:
         print("❌ Error: configs.json not found.")
         print(f"\nFirst-time setup:")
-        print(f"  1. Create the data directory:  mkdir -p ~/.motoregis/veiculos")
+        print(f"  1. Create the data directory:  mkdir -p ~/.motoregis")
         print(f"  2. Copy the example config:    cp configs.example.json ~/.motoregis/configs.json")
-        print(f"  3. Copy the example vehicle:   cp veiculos/example_vehicle.json ~/.motoregis/veiculos/")
+        print(f"  3. Copy the example vehicle:   cp example_vehicle.json ~/.motoregis/")
         print(f"  4. Edit both files with your vehicle's details.")
         exit(1)
     return config
@@ -205,7 +219,7 @@ def prompt_odometer(path: str) -> int:
 def _finalize(csv_path: str, json_path: str, vehicle_name: str, date_str: str, odometer: int, config: dict) -> None:
     check_maintenance(csv_path, json_path, odometer, date_str)
     if config.get('git_sync', False):
-        git_sync(csv_path, vehicle_name, date_str, odometer)
+        git_sync(csv_path, vehicle_name, date_str, odometer, config)
     print("\n✅ Saved!")
 
 def record_fuel(csv_path: str, json_path: str, vehicle_name: str, date_str: str, config: dict) -> None:
@@ -257,6 +271,33 @@ def record_scheduled_maintenance(csv_path: str, json_path: str, vehicle_name: st
     append_record(csv_path, [date_str, odometer, 2, f"{cost:.2f}", "0.00", details])
     _finalize(csv_path, json_path, vehicle_name, date_str, odometer, config)
 
+def setup_sync(config: dict) -> None:
+    print("\n=== Sync Setup ===")
+    current = config.get('git_remote') or '(not set)'
+    print(f"  Current remote: {current}")
+    url = input("  Private repo URL (blank to cancel): ").strip()
+    if not url:
+        return
+    config['git_remote'] = url
+    config['git_sync'] = True
+    with open(os.path.join(DATA_DIR, 'configs.json'), 'w', encoding='utf-8') as f:
+        json.dump(config, f, indent=2)
+    if not os.path.exists(os.path.join(DATA_DIR, '.git')):
+        subprocess.run(['git', '-C', DATA_DIR, 'init'], capture_output=True)
+    _ensure_gitignore()
+    subprocess.run(['git', '-C', DATA_DIR, 'remote', 'remove', 'origin'], capture_output=True)
+    subprocess.run(['git', '-C', DATA_DIR, 'remote', 'add', 'origin', url], capture_output=True)
+    subprocess.run(['git', '-C', DATA_DIR, 'add', '.'], capture_output=True)
+    result = subprocess.run(['git', '-C', DATA_DIR, 'commit', '-m', 'setup: initial sync'], capture_output=True, text=True)
+    if result.returncode == 0:
+        push = subprocess.run(['git', '-C', DATA_DIR, 'push', '-u', 'origin', 'main'], capture_output=True, text=True)
+        if push.returncode == 0:
+            print("\n✅ Sync configured and initial push done!")
+        else:
+            print("\n⚠️  Remote set but push failed — check SSH/token access.")
+    else:
+        print("\n✅ Sync configured. Will push on next record.")
+
 def record_generic(csv_path: str, json_path: str, vehicle_name: str, category_idx: int, category_name: str, date_str: str, config: dict) -> None:
     print(f"\n--- {category_name} ---\n")
     odometer = prompt_odometer(csv_path)
@@ -286,9 +327,10 @@ def main() -> None:
         print(f"\n[ {vehicle_name} | {current_date} ]")
         for i, cat in enumerate(categories, 1):
             print(f"  {i}. {cat}")
+        print("  8. Setup Sync")
         print("  0. Exit")
 
-        choice = select_index("Option: ", len(categories))
+        choice = select_index("Option: ", len(categories) + 1)
 
         if choice == 0:
             break
@@ -313,6 +355,8 @@ def main() -> None:
                     current_date = new_date
                 except ValueError:
                     print("❌ Invalid format. Use YYYY-MM-DD")
+        elif choice == 8:
+            setup_sync(config)
 
 if __name__ == '__main__':
     main()
