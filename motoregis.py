@@ -115,7 +115,7 @@ def display_name(key: str, vehicle: dict | None = None) -> str:
     return ' '.join(key.split('_')).capitalize()
 
 def load_config() -> dict:
-    config = load_json('configs.json')
+    config = load_json('~/motoregis/configs.json')
     if config is None:
         print("❌ Error: configs.json not found.")
         print(f"\nFirst-time setup:")
@@ -280,7 +280,7 @@ def setup_sync(config: dict) -> None:
         return
     config['git_remote'] = url
     config['git_sync'] = True
-    with open(os.path.join(DATA_DIR, 'configs.json'), 'w', encoding='utf-8') as f:
+    with open(os.path.join(DATA_DIR, '~motoregis/configs.json'), 'w', encoding='utf-8') as f:
         json.dump(config, f, indent=2)
     if not os.path.exists(os.path.join(DATA_DIR, '.git')):
         subprocess.run(['git', '-C', DATA_DIR, 'init'], capture_output=True)
