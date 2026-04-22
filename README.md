@@ -12,7 +12,7 @@ A minimalist command-line tool for tracking vehicle fuel, maintenance, and costs
 
 MotoRegis logs vehicle events to a plain CSV file — fuel fills, scheduled maintenance, accessories, corrective repairs, and bureaucracy (taxes, licensing). After each entry it checks whether any maintenance item is overdue by mileage, months, or days, and alerts you immediately.
 
-Data lives in `~/.motoregis/` and is never locked into a proprietary format. Bring your own analysis tool (pandas, Excel, anything).
+Data lives in `~/motoregis/` and is never locked into a proprietary format. Bring your own analysis tool (pandas, Excel, anything).
 
 ---
 
@@ -32,20 +32,20 @@ motoregis
 
 ## First-time setup
 
-MotoRegis stores your configuration and data in `~/.motoregis/`. On first run, if no config is found, the tool will print setup instructions.
+MotoRegis stores your configuration and data in `~/motoregis/`. On first run, if no config is found, the tool will print setup instructions.
 
 ```bash
 # 1. Create the data directory
-mkdir -p ~/.motoregis/veiculos
+mkdir -p ~/motoregis/veiculos
 
 # 2. Copy the example config and edit it
-cp configs.example.json ~/.motoregis/configs.json
+cp configs.example.json ~/motoregis/configs.json
 
 # 3. Copy the example vehicle config and edit it
-cp veiculos/example_vehicle.json ~/.motoregis/veiculos/my_vehicle.json
+cp veiculos/example_vehicle.json ~/motoregis/veiculos/my_vehicle.json
 ```
 
-Edit `~/.motoregis/configs.json` to point to your vehicle file:
+Edit `~/motoregis/configs.json` to point to your vehicle file:
 
 ```json
 {
@@ -61,7 +61,7 @@ Edit `~/.motoregis/configs.json` to point to your vehicle file:
 }
 ```
 
-Set `"git_sync": true` if you want automatic git commit and push after each record (requires `~/.motoregis/` to be a git repository).
+Set `"git_sync": true` if you want automatic git commit and push after each record (requires `~/motoregis/` to be a git repository).
 
 ---
 
@@ -97,7 +97,7 @@ Keys in `nomes_display` map internal identifiers to human-readable labels shown 
 
 ## CSV schema
 
-All records are appended to `~/.motoregis/veiculos/<vehicle>.csv`:
+All records are appended to `~/motoregis/veiculos/<vehicle>.csv`:
 
 | Column | Type | Description | Example |
 |---|---|---|---|

@@ -19,7 +19,7 @@ import os
 import subprocess
 from datetime import datetime
 
-DATA_DIR = os.path.join(os.path.expanduser("~"), ".motoregis")
+DATA_DIR = os.path.join(os.path.expanduser("~"), "motoregis")
 
 
 # ==========================================
@@ -119,9 +119,9 @@ def load_config() -> dict:
     if config is None:
         print("❌ Error: configs.json not found.")
         print(f"\nFirst-time setup:")
-        print(f"  1. Create the data directory:  mkdir -p ~/.motoregis")
-        print(f"  2. Copy the example config:    cp configs.example.json ~/.motoregis/configs.json")
-        print(f"  3. Copy the example vehicle:   cp example_vehicle.json ~/.motoregis/")
+        print(f"  1. Create the data directory:  mkdir -p ~/motoregis/veiculos")
+        print(f"  2. Copy the example config:    cp configs.example.json ~/motoregis/configs.json")
+        print(f"  3. Copy the example vehicle:   cp example_vehicle.json ~/motoregis/veiculos/")
         print(f"  4. Edit both files with your vehicle's details.")
         exit(1)
     return config
