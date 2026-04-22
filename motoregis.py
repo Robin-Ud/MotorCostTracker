@@ -118,15 +118,16 @@ def get_last_odometer(path: str) -> int:
     except (IndexError, ValueError):
         return 0
 
-def get_last_fuel_record(path: str) -> tuple[int | None, float | None, str | None]:
+def get_last_fuel_record(path: str) -> tuple[int | None, float | None, str | None, bool]:
     data = read_csv(path)
     for row in reversed(data[1:]):
         try:
             if row[2] == '1' and float(row[4]) > 0:
-                return int(row[1]), float(row[4]), row[0]
+                was_full = '|parcial' not in (row[5] if len(row) > 5 else '')
+                return int(row[1]), float(row[4]), row[0], was_full
         except (IndexError, ValueError):
             continue
-    return None, None, None
+    return None, None, None, True
 
 def check_maintenance(csv_path: str, json_path: str, current_odometer: int, current_date: str) -> None:
     vehicle = load_json(json_path)
@@ -137,8 +138,8 @@ def check_maintenance(csv_path: str, json_path: str, current_odometer: int, curr
         return
 
     maintenance = vehicle.get('manutencoes', {})
-    current_date_dt = datetime.strptime(current_date, '%Y-%m-%d')
-    first_date = datetime.strptime(data[1][0], '%Y-%m-%d')
+    current_date_dt = datetime.strptime(current_date, '%d/%m/%y')
+    first_date = datetime.strptime(data[1][0], '%d/%m/%y')
     first_odometer = int(data[1][1])
     alerts = []
 
@@ -157,14 +158,14 @@ def check_maintenance(csv_path: str, json_path: str, current_odometer: int, curr
 
     for name, months in maintenance.get('por_tempo_meses', {}).items():
         last = last_maintenance(name)
-        ref_date = datetime.strptime(last[0], '%Y-%m-%d') if last else first_date
+        ref_date = datetime.strptime(last[0], '%d/%m/%y') if last else first_date
         delta_months = (current_date_dt.year - ref_date.year) * 12 + (current_date_dt.month - ref_date.month)
         if delta_months >= months:
             alerts.append((display_name(name, vehicle), f"{delta_months} meses atrás (a cada {months} meses)"))
 
     for name, days in maintenance.get('por_tempo_dias', {}).items():
         last = last_maintenance(name)
-        ref_date = datetime.strptime(last[0], '%Y-%m-%d') if last else first_date
+        ref_date = datetime.strptime(last[0], '%d/%m/%y') if last else first_date
         delta_days = (current_date_dt - ref_date).days
         if delta_days >= days:
             alerts.append((display_name(name, vehicle), f"{delta_days} dias atrás (a cada {days} dias)"))
@@ -191,9 +192,9 @@ def _finalize(csv_path: str, json_path: str, vehicle_name: str, date_str: str, o
         git_sync(vehicle_name, date_str, odometer, config)
     print("\n✅ Salvo!")
 
-def record_fuel(csv_path: str, json_path: str, vehicle_name: str, date_str: str, config: dict) -> None:
+def record_fuel(csv_path: str, json_path: str, vehicle_name: str, date_str: str, config: dict, full_tank: bool = True) -> None:
     print("\n--- Abastecimento ---")
-    last_odo, _, last_date = get_last_fuel_record(csv_path)
+    last_odo, _, last_date, last_was_full = get_last_fuel_record(csv_path)
     odometer = prompt_odometer(csv_path)
     cost = get_float("  Custo total: ")
     liters = get_float("  Litros: ")
@@ -203,18 +204,22 @@ def record_fuel(csv_path: str, json_path: str, vehicle_name: str, date_str: str,
     for i, ft in enumerate(fuel_types, 1):
         print(f"  {i}. {ft}")
     idx = select_index("  Combustível: ", len(fuel_types))
-    details = fuel_types[idx - 1] if idx > 0 else "outro"
+    fuel = fuel_types[idx - 1] if idx > 0 else "outro"
+    details = f"{fuel}|{'cheio' if full_tank else 'parcial'}"
 
     append_record(csv_path, [date_str, odometer, 1, f"{cost:.2f}", f"{liters:.2f}", details])
 
     if last_odo and liters > 0:
         km_driven = odometer - last_odo
         sym = config.get('currency_symbol', 'R$')
-        print(f"\n  Consumo:      {km_driven / liters:.2f} km/L  ({km_driven} km / {liters:.2f} L)")
-        if km_driven > 0:
-            print(f"  Custo/100km:  {sym}{cost / km_driven * 100:.2f}  ({sym}{cost:.2f} / {km_driven} km)")
+        if full_tank and last_was_full:
+            print(f"\n  Consumo:      {km_driven / liters:.2f} km/L  ({km_driven} km / {liters:.2f} L)")
+            if km_driven > 0:
+                print(f"  Custo/100km:  {sym}{cost / km_driven * 100:.2f}  ({sym}{cost:.2f} / {km_driven} km)")
+        else:
+            print(f"\n  (consumo omitido — abastecimento parcial)")
         if last_date:
-            days = (datetime.strptime(date_str, '%Y-%m-%d') - datetime.strptime(last_date, '%Y-%m-%d')).days
+            days = (datetime.strptime(date_str, '%d/%m/%y') - datetime.strptime(last_date, '%d/%m/%y')).days
             threshold = config.get('daily_km_threshold', 40)
             if days > 0 and km_driven / days <= threshold:
                 print(f"  Custo/dia:    {sym}{cost / days:.2f}  ({sym}{cost:.2f} / {days} dias)")
@@ -288,21 +293,24 @@ def main() -> None:
     vehicle_name = vehicles[0]
     json_path = config['veiculos_index'][vehicle_name]
     csv_path = json_path.replace('.json', '.csv')
-    current_date = datetime.now().strftime('%Y-%m-%d')
+    current_date = datetime.now().strftime('%d/%m/%y')
+    full_tank = True
 
     while True:
-        print(f"\n[ {vehicle_name} | {current_date} ]")
+        tank_label = "cheio" if full_tank else "parcial"
+        print(f"\n[ {vehicle_name} | {current_date} | tanque: {tank_label} ]")
         for i, cat in enumerate(categories, 1):
             print(f"  {i}. {cat}")
+        print(f"  9. Tanque: {tank_label}")
         print("  8. Configurar Sync")
         print("  0. Sair")
 
-        choice = select_index("Opção: ", len(categories) + 1)
+        choice = select_index("Opção: ", len(categories) + 2)
 
         if choice == 0:
             break
         elif choice == 1:
-            record_fuel(csv_path, json_path, vehicle_name, current_date, config)
+            record_fuel(csv_path, json_path, vehicle_name, current_date, config, full_tank)
             break
         elif choice == 2:
             record_scheduled_maintenance(csv_path, json_path, vehicle_name, current_date, config)
@@ -315,15 +323,21 @@ def main() -> None:
             if new_name:
                 vehicle_name, json_path, csv_path = new_name, new_json, new_csv
         elif choice == 7:
-            new_date = input(f"  Nova data AAAA-MM-DD [{current_date}]: ").strip()
-            if new_date:
+            today = datetime.now()
+            new_str = input(f"  Nova data DD/MM [{current_date}]: ").strip()
+            if new_str:
                 try:
-                    datetime.strptime(new_date, '%Y-%m-%d')
-                    current_date = new_date
+                    parsed = datetime.strptime(f"{new_str}/{today.year}", '%d/%m/%Y')
+                    if parsed.date() > today.date():
+                        print("❌ Data não pode ser no futuro")
+                    else:
+                        current_date = parsed.strftime('%d/%m/%y')
                 except ValueError:
-                    print("❌ Formato inválido. Use AAAA-MM-DD")
+                    print("❌ Formato inválido. Use DD/MM")
         elif choice == 8:
             setup_sync(config)
+        elif choice == 9:
+            full_tank = not full_tank
 
 if __name__ == '__main__':
     main()
