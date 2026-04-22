@@ -1,13 +1,3 @@
-motoregis.egg-info/
-checklist.md
-*pycache*
 __pycache__/
 *.pyc
-
-# Personal vehicle data — never commit
-veiculos/*.csv
-veiculos/*.json
-!veiculos/example.csv
-!veiculos/example_vehicle.json
-configs.json
-!configs.example.json
+motoregis.egg-info/

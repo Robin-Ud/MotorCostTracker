@@ -1,30 +1,14 @@
-"""
-MotoRegis — Vehicle Cost Tracker
----------------------------------------------------------
-Design principles:
-1. KISS (Keep It Simple, Stupid): Prefer fewer lines and no unnecessary packages.
-2. DRY (Don't Repeat Yourself): Input capture and validation functions are generic.
-3. Low friction: Optimized for fast daily use in a terminal environment.
-4. Portability: Data stored in CSV so the user owns their information.
-5. Interface agnosticism: Validation logic is isolated from input capture,
-   enabling future migration to TUI/GUI.
-
-License: GNU GPLv3
----------------------------------------------------------
-"""
-
 import csv
 import json
 import os
 import subprocess
 from datetime import datetime
 
-DATA_DIR = os.path.join(os.path.expanduser("~"), "motoregis")
+DATA_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 # ==========================================
-# ZONE 1: DATA ENGINES (JSON and CSV)
-# Dumb functions. They only read and write, they don't make decisions.
+# ZONE 1: DATA ENGINES
 # ==========================================
 
 def load_json(path: str) -> dict | None:
@@ -45,16 +29,9 @@ def append_record(path: str, row: list) -> None:
     with open(os.path.join(DATA_DIR, path), 'a', newline='', encoding='utf-8') as f:
         csv.writer(f).writerow(row)
 
-def _ensure_gitignore() -> None:
-    path = os.path.join(DATA_DIR, '.gitignore')
-    if not os.path.exists(path):
-        with open(path, 'w', encoding='utf-8') as f:
-            f.write('*\n!*.json\n!*.csv\n!.gitignore\n')
-
-def git_sync(csv_path: str, vehicle_name: str, date_str: str, odometer: int, config: dict) -> None:
+def git_sync(vehicle_name: str, date_str: str, odometer: int, config: dict) -> None:
     if not os.path.exists(os.path.join(DATA_DIR, '.git')):
         subprocess.run(['git', '-C', DATA_DIR, 'init'], capture_output=True)
-    _ensure_gitignore()
     remote_url = config.get('git_remote', '')
     if remote_url:
         has_remote = subprocess.run(['git', '-C', DATA_DIR, 'remote', 'get-url', 'origin'], capture_output=True)
@@ -69,7 +46,6 @@ def git_sync(csv_path: str, vehicle_name: str, date_str: str, odometer: int, con
 
 # ==========================================
 # ZONE 2: VALIDATORS
-# Ensure the user doesn't type text where a number is expected, etc.
 # ==========================================
 
 def select_index(prompt: str, max_value: int) -> int:
@@ -78,9 +54,9 @@ def select_index(prompt: str, max_value: int) -> int:
             value = int(input(prompt))
             if value in range(0, max_value + 1):
                 return value
-            print(f'❌ Enter a value between 0 and {max_value}')
+            print(f'❌ Entre 0 e {max_value}')
         except ValueError:
-            print('❌ Please enter an integer')
+            print('❌ Digite um número inteiro')
 
 def get_float(prompt: str) -> float:
     while True:
@@ -89,9 +65,9 @@ def get_float(prompt: str) -> float:
             value = float(entry)
             if value >= 0:
                 return value
-            print('❌ Enter a value greater than or equal to 0')
+            print('❌ Valor deve ser maior ou igual a 0')
         except ValueError:
-            print('❌ Numbers only')
+            print('❌ Apenas números')
 
 def get_int(prompt: str) -> int:
     while True:
@@ -99,14 +75,13 @@ def get_int(prompt: str) -> int:
             value = int(input(prompt).strip())
             if value >= 0:
                 return value
-            print('❌ Enter a value greater than or equal to 0')
+            print('❌ Valor deve ser maior ou igual a 0')
         except ValueError:
-            print('❌ Please enter an integer')
+            print('❌ Digite um número inteiro')
 
 
 # ==========================================
 # ZONE 3: ORCHESTRATION
-# Combine validators and route data to the engines.
 # ==========================================
 
 def display_name(key: str, vehicle: dict | None = None) -> str:
@@ -115,24 +90,19 @@ def display_name(key: str, vehicle: dict | None = None) -> str:
     return ' '.join(key.split('_')).capitalize()
 
 def load_config() -> dict:
-    config = load_json('~/motoregis/configs.json')
+    config = load_json('configs.json')
     if config is None:
-        print("❌ Error: configs.json not found.")
-        print(f"\nFirst-time setup:")
-        print(f"  1. Create the data directory:  mkdir -p ~/motoregis/veiculos")
-        print(f"  2. Copy the example config:    cp configs.example.json ~/motoregis/configs.json")
-        print(f"  3. Copy the example vehicle:   cp example_vehicle.json ~/motoregis/veiculos/")
-        print(f"  4. Edit both files with your vehicle's details.")
+        print("❌ configs.json não encontrado.")
         exit(1)
     return config
 
 def select_vehicle(config: dict) -> tuple[str | None, str | None, str | None]:
     vehicles = list(config['veiculos_index'].keys())
-    print("\n=== Select Vehicle ===")
+    print("\n=== Selecionar Veículo ===")
     for i, name in enumerate(vehicles, 1):
         print(f"  {i}. {name}")
-    print("  0. Cancel")
-    idx = select_index("Vehicle: ", len(vehicles))
+    print("  0. Cancelar")
+    idx = select_index("Veículo: ", len(vehicles))
     if idx == 0:
         return None, None, None
     name = vehicles[idx - 1]
@@ -162,7 +132,6 @@ def check_maintenance(csv_path: str, json_path: str, current_odometer: int, curr
     vehicle = load_json(json_path)
     if vehicle is None:
         return
-
     data = read_csv(csv_path)
     if len(data) <= 1:
         return
@@ -184,24 +153,24 @@ def check_maintenance(csv_path: str, json_path: str, current_odometer: int, curr
         ref_odometer = int(last[1]) if last else first_odometer
         km_since = current_odometer - ref_odometer
         if km_since >= interval:
-            alerts.append((display_name(name, vehicle), f"{km_since} km ago ({interval} km)"))
+            alerts.append((display_name(name, vehicle), f"{km_since} km atrás (a cada {interval} km)"))
 
     for name, months in maintenance.get('por_tempo_meses', {}).items():
         last = last_maintenance(name)
         ref_date = datetime.strptime(last[0], '%Y-%m-%d') if last else first_date
         delta_months = (current_date_dt.year - ref_date.year) * 12 + (current_date_dt.month - ref_date.month)
         if delta_months >= months:
-            alerts.append((display_name(name, vehicle), f"{delta_months} months ago ({months} months)"))
+            alerts.append((display_name(name, vehicle), f"{delta_months} meses atrás (a cada {months} meses)"))
 
     for name, days in maintenance.get('por_tempo_dias', {}).items():
         last = last_maintenance(name)
         ref_date = datetime.strptime(last[0], '%Y-%m-%d') if last else first_date
         delta_days = (current_date_dt - ref_date).days
         if delta_days >= days:
-            alerts.append((display_name(name, vehicle), f"{delta_days} days ago ({days} days)"))
+            alerts.append((display_name(name, vehicle), f"{delta_days} dias atrás (a cada {days} dias)"))
 
     if alerts:
-        print("\n--- Pending maintenance ---\n")
+        print("\n--- Manutenções pendentes ---\n")
         for name_display, info in alerts:
             print(f"  ⚠️  {name_display}")
             print(f"      {info}")
@@ -209,108 +178,106 @@ def check_maintenance(csv_path: str, json_path: str, current_odometer: int, curr
 
 def prompt_odometer(path: str) -> int:
     last_km = get_last_odometer(path)
-    print(f"  Last odometer: {last_km} km")
+    print(f"  Último odômetro: {last_km} km")
     while True:
-        odometer = get_int("  Current odometer (km): ")
+        odometer = get_int("  Odômetro atual (km): ")
         if odometer >= last_km:
             return odometer
-        print(f"❌ Odometer cannot be lower than the last record ({last_km} km)")
+        print(f"❌ Odômetro não pode ser menor que o último registro ({last_km} km)")
 
 def _finalize(csv_path: str, json_path: str, vehicle_name: str, date_str: str, odometer: int, config: dict) -> None:
     check_maintenance(csv_path, json_path, odometer, date_str)
     if config.get('git_sync', False):
-        git_sync(csv_path, vehicle_name, date_str, odometer, config)
-    print("\n✅ Saved!")
+        git_sync(vehicle_name, date_str, odometer, config)
+    print("\n✅ Salvo!")
 
 def record_fuel(csv_path: str, json_path: str, vehicle_name: str, date_str: str, config: dict) -> None:
-    print("\n--- Fuel ---")
+    print("\n--- Abastecimento ---")
     last_odo, _, last_date = get_last_fuel_record(csv_path)
     odometer = prompt_odometer(csv_path)
-    cost = get_float("  Total cost: ")
-    liters = get_float("  Liters: ")
+    cost = get_float("  Custo total: ")
+    liters = get_float("  Litros: ")
 
     print()
     fuel_types = config['combustiveis']
     for i, ft in enumerate(fuel_types, 1):
         print(f"  {i}. {ft}")
-    idx = select_index("  Fuel type: ", len(fuel_types))
-    details = fuel_types[idx - 1] if idx > 0 else "other"
+    idx = select_index("  Combustível: ", len(fuel_types))
+    details = fuel_types[idx - 1] if idx > 0 else "outro"
 
     append_record(csv_path, [date_str, odometer, 1, f"{cost:.2f}", f"{liters:.2f}", details])
 
     if last_odo and liters > 0:
         km_driven = odometer - last_odo
-        sym = config.get('currency_symbol', '')
-        print(f"\n  Consumption:  {km_driven / liters:.2f} km/L  ({km_driven} km / {liters:.2f} L)")
+        sym = config.get('currency_symbol', 'R$')
+        print(f"\n  Consumo:      {km_driven / liters:.2f} km/L  ({km_driven} km / {liters:.2f} L)")
         if km_driven > 0:
-            print(f"  Cost/100km:   {sym}{cost / km_driven * 100:.2f}  ({sym}{cost:.2f} / {km_driven} km)")
+            print(f"  Custo/100km:  {sym}{cost / km_driven * 100:.2f}  ({sym}{cost:.2f} / {km_driven} km)")
         if last_date:
             days = (datetime.strptime(date_str, '%Y-%m-%d') - datetime.strptime(last_date, '%Y-%m-%d')).days
             threshold = config.get('daily_km_threshold', 40)
             if days > 0 and km_driven / days <= threshold:
-                print(f"  Cost/day:     {sym}{cost / days:.2f}  ({sym}{cost:.2f} / {days} days)")
+                print(f"  Custo/dia:    {sym}{cost / days:.2f}  ({sym}{cost:.2f} / {days} dias)")
 
     _finalize(csv_path, json_path, vehicle_name, date_str, odometer, config)
 
 def record_scheduled_maintenance(csv_path: str, json_path: str, vehicle_name: str, date_str: str, config: dict) -> None:
-    print("\n--- Scheduled Maintenance ---")
+    print("\n--- Manutenção Preventiva ---")
     vehicle = load_json(json_path)
     options = list(vehicle.get('manutencoes', {}).get('por_quilometragem', {}).keys())
 
     print()
     for i, name in enumerate(options, 1):
         print(f"  {i:2}. {display_name(name, vehicle)}")
-    print("   0. Other")
+    print("   0. Outra")
     print()
-    idx = select_index("Maintenance: ", len(options))
-    details = input("  Describe: ").strip().replace(' ', '_').lower() if idx == 0 else options[idx - 1]
+    idx = select_index("Manutenção: ", len(options))
+    details = input("  Descreva: ").strip().replace(' ', '_').lower() if idx == 0 else options[idx - 1]
 
     odometer = prompt_odometer(csv_path)
-    cost = get_float("  Cost: ")
+    cost = get_float("  Custo: ")
 
     append_record(csv_path, [date_str, odometer, 2, f"{cost:.2f}", "0.00", details])
     _finalize(csv_path, json_path, vehicle_name, date_str, odometer, config)
 
 def setup_sync(config: dict) -> None:
-    print("\n=== Sync Setup ===")
-    current = config.get('git_remote') or '(not set)'
-    print(f"  Current remote: {current}")
-    url = input("  Private repo URL (blank to cancel): ").strip()
+    print("\n=== Configurar Sync ===")
+    current = config.get('git_remote') or '(não configurado)'
+    print(f"  Remote atual: {current}")
+    url = input("  URL do repo privado (vazio para cancelar): ").strip()
     if not url:
         return
     config['git_remote'] = url
     config['git_sync'] = True
-    with open(os.path.join(DATA_DIR, '~motoregis/configs.json'), 'w', encoding='utf-8') as f:
-        json.dump(config, f, indent=2)
+    with open(os.path.join(DATA_DIR, 'configs.json'), 'w', encoding='utf-8') as f:
+        json.dump(config, f, indent=2, ensure_ascii=False)
     if not os.path.exists(os.path.join(DATA_DIR, '.git')):
         subprocess.run(['git', '-C', DATA_DIR, 'init'], capture_output=True)
-    _ensure_gitignore()
     subprocess.run(['git', '-C', DATA_DIR, 'remote', 'remove', 'origin'], capture_output=True)
     subprocess.run(['git', '-C', DATA_DIR, 'remote', 'add', 'origin', url], capture_output=True)
     subprocess.run(['git', '-C', DATA_DIR, 'add', '.'], capture_output=True)
-    result = subprocess.run(['git', '-C', DATA_DIR, 'commit', '-m', 'setup: initial sync'], capture_output=True, text=True)
+    result = subprocess.run(['git', '-C', DATA_DIR, 'commit', '-m', 'setup: sync inicial'], capture_output=True, text=True)
     if result.returncode == 0:
         push = subprocess.run(['git', '-C', DATA_DIR, 'push', '-u', 'origin', 'main'], capture_output=True, text=True)
         if push.returncode == 0:
-            print("\n✅ Sync configured and initial push done!")
+            print("\n✅ Sync configurado e push inicial feito!")
         else:
-            print("\n⚠️  Remote set but push failed — check SSH/token access.")
+            print("\n⚠️  Remote configurado mas push falhou — verifique acesso SSH/token.")
     else:
-        print("\n✅ Sync configured. Will push on next record.")
+        print("\n✅ Sync configurado. Vai sincronizar no próximo registro.")
 
 def record_generic(csv_path: str, json_path: str, vehicle_name: str, category_idx: int, category_name: str, date_str: str, config: dict) -> None:
     print(f"\n--- {category_name} ---\n")
     odometer = prompt_odometer(csv_path)
-    cost = get_float("  Cost: ")
-    details = input("  Details: ").strip().replace(' ', '_').lower()
+    cost = get_float("  Custo: ")
+    details = input("  Detalhes: ").strip().replace(' ', '_').lower()
 
     append_record(csv_path, [date_str, odometer, category_idx, f"{cost:.2f}", "0.00", details])
     _finalize(csv_path, json_path, vehicle_name, date_str, odometer, config)
 
 
 # ==========================================
-# ZONE 4: INTERFACE (Main Menu)
-# Entry point where the script starts running.
+# ZONE 4: INTERFACE
 # ==========================================
 
 def main() -> None:
@@ -327,10 +294,10 @@ def main() -> None:
         print(f"\n[ {vehicle_name} | {current_date} ]")
         for i, cat in enumerate(categories, 1):
             print(f"  {i}. {cat}")
-        print("  8. Setup Sync")
-        print("  0. Exit")
+        print("  8. Configurar Sync")
+        print("  0. Sair")
 
-        choice = select_index("Option: ", len(categories) + 1)
+        choice = select_index("Opção: ", len(categories) + 1)
 
         if choice == 0:
             break
@@ -348,13 +315,13 @@ def main() -> None:
             if new_name:
                 vehicle_name, json_path, csv_path = new_name, new_json, new_csv
         elif choice == 7:
-            new_date = input(f"  New date YYYY-MM-DD [{current_date}]: ").strip()
+            new_date = input(f"  Nova data AAAA-MM-DD [{current_date}]: ").strip()
             if new_date:
                 try:
                     datetime.strptime(new_date, '%Y-%m-%d')
                     current_date = new_date
                 except ValueError:
-                    print("❌ Invalid format. Use YYYY-MM-DD")
+                    print("❌ Formato inválido. Use AAAA-MM-DD")
         elif choice == 8:
             setup_sync(config)
 
