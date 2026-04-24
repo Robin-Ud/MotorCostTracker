@@ -192,19 +192,29 @@ def _finalize(csv_path: str, json_path: str, vehicle_name: str, date_str: str, o
         git_sync(vehicle_name, date_str, odometer, config)
     print("\n✅ Salvo!")
 
-def record_fuel(csv_path: str, json_path: str, vehicle_name: str, date_str: str, config: dict, full_tank: bool = True) -> None:
+def record_fuel(csv_path: str, json_path: str, vehicle_name: str, date_str: str, config: dict) -> None:
     print("\n--- Abastecimento ---")
     last_odo, _, last_date, last_was_full = get_last_fuel_record(csv_path)
     odometer = prompt_odometer(csv_path)
     cost = get_float("  Custo total: ")
     liters = get_float("  Litros: ")
 
-    print()
     fuel_types = config['combustiveis']
-    for i, ft in enumerate(fuel_types, 1):
-        print(f"  {i}. {ft}")
-    idx = select_index("  Combustível: ", len(fuel_types))
-    fuel = fuel_types[idx - 1] if idx > 0 else "outro"
+    toggle_idx = len(fuel_types) + 1
+    full_tank = last_was_full
+
+    while True:
+        tank_label = "cheio" if full_tank else "parcial"
+        print(f"\n  Selecione o combustível [{tank_label} | {toggle_idx} para alterar]\n")
+        for i, ft in enumerate(fuel_types, 1):
+            print(f"  {i}. {ft}")
+        idx = select_index("  : ", toggle_idx)
+        if idx == toggle_idx:
+            full_tank = not full_tank
+        else:
+            fuel = fuel_types[idx - 1] if idx > 0 else "outro"
+            break
+
     details = f"{fuel}|{'cheio' if full_tank else 'parcial'}"
 
     append_record(csv_path, [date_str, odometer, 1, f"{cost:.2f}", f"{liters:.2f}", details])
@@ -245,31 +255,6 @@ def record_scheduled_maintenance(csv_path: str, json_path: str, vehicle_name: st
     append_record(csv_path, [date_str, odometer, 2, f"{cost:.2f}", "0.00", details])
     _finalize(csv_path, json_path, vehicle_name, date_str, odometer, config)
 
-def setup_sync(config: dict) -> None:
-    print("\n=== Configurar Sync ===")
-    current = config.get('git_remote') or '(não configurado)'
-    print(f"  Remote atual: {current}")
-    url = input("  URL do repo privado (vazio para cancelar): ").strip()
-    if not url:
-        return
-    config['git_remote'] = url
-    config['git_sync'] = True
-    with open(os.path.join(DATA_DIR, 'configs.json'), 'w', encoding='utf-8') as f:
-        json.dump(config, f, indent=2, ensure_ascii=False)
-    if not os.path.exists(os.path.join(DATA_DIR, '.git')):
-        subprocess.run(['git', '-C', DATA_DIR, 'init'], capture_output=True)
-    subprocess.run(['git', '-C', DATA_DIR, 'remote', 'remove', 'origin'], capture_output=True)
-    subprocess.run(['git', '-C', DATA_DIR, 'remote', 'add', 'origin', url], capture_output=True)
-    subprocess.run(['git', '-C', DATA_DIR, 'add', '.'], capture_output=True)
-    result = subprocess.run(['git', '-C', DATA_DIR, 'commit', '-m', 'setup: sync inicial'], capture_output=True, text=True)
-    if result.returncode == 0:
-        push = subprocess.run(['git', '-C', DATA_DIR, 'push', '-u', 'origin', 'main'], capture_output=True, text=True)
-        if push.returncode == 0:
-            print("\n✅ Sync configurado e push inicial feito!")
-        else:
-            print("\n⚠️  Remote configurado mas push falhou — verifique acesso SSH/token.")
-    else:
-        print("\n✅ Sync configurado. Vai sincronizar no próximo registro.")
 
 def record_generic(csv_path: str, json_path: str, vehicle_name: str, category_idx: int, category_name: str, date_str: str, config: dict) -> None:
     print(f"\n--- {category_name} ---\n")
@@ -294,23 +279,19 @@ def main() -> None:
     json_path = config['veiculos_index'][vehicle_name]
     csv_path = json_path.replace('.json', '.csv')
     current_date = datetime.now().strftime('%d/%m/%y')
-    full_tank = True
 
     while True:
-        tank_label = "cheio" if full_tank else "parcial"
-        print(f"\n[ {vehicle_name} | {current_date} | tanque: {tank_label} ]")
+        print(f"\n[ {vehicle_name} | {current_date} ]")
         for i, cat in enumerate(categories, 1):
             print(f"  {i}. {cat}")
-        print(f"  9. Tanque: {tank_label}")
-        print("  8. Configurar Sync")
         print("  0. Sair")
 
-        choice = select_index("Opção: ", len(categories) + 2)
+        choice = select_index("Opção: ", len(categories))
 
         if choice == 0:
             break
         elif choice == 1:
-            record_fuel(csv_path, json_path, vehicle_name, current_date, config, full_tank)
+            record_fuel(csv_path, json_path, vehicle_name, current_date, config)
             break
         elif choice == 2:
             record_scheduled_maintenance(csv_path, json_path, vehicle_name, current_date, config)
@@ -334,10 +315,6 @@ def main() -> None:
                         current_date = parsed.strftime('%d/%m/%y')
                 except ValueError:
                     print("❌ Formato inválido. Use DD/MM")
-        elif choice == 8:
-            setup_sync(config)
-        elif choice == 9:
-            full_tank = not full_tank
 
 if __name__ == '__main__':
     main()
