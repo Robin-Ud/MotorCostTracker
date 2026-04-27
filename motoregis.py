@@ -41,6 +41,7 @@ def git_sync(vehicle_name: str, date_str: str, odometer: int, config: dict) -> N
     subprocess.run(['git', '-C', DATA_DIR, 'add', '.'], capture_output=True)
     result = subprocess.run(['git', '-C', DATA_DIR, 'commit', '-m', msg], capture_output=True, text=True)
     if result.returncode == 0:
+        subprocess.run(['git', '-C', DATA_DIR, 'pull', '--rebase'], capture_output=True)
         subprocess.run(['git', '-C', DATA_DIR, 'push'], capture_output=True)
 
 
