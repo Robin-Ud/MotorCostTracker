@@ -239,13 +239,7 @@ def record_fuel(csv_path: str, json_path: str, vehicle_name: str, date_str: str,
 
 def _alloc_labor(labor: float, parts: list[float]) -> list[float]:
     n = len(parts)
-    equal = labor / 2 / n
-    parts_total = sum(parts)
-    if parts_total == 0:
-        alloc = [labor / n] * n
-    else:
-        alloc = [equal + (labor / 2) * (p / parts_total) for p in parts]
-    # absorb rounding error in last item
+    alloc = [labor / n] * n
     alloc[-1] += labor - sum(alloc)
     return alloc
 
