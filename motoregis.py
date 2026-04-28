@@ -242,18 +242,59 @@ def record_scheduled_maintenance(csv_path: str, json_path: str, vehicle_name: st
     vehicle = load_json(json_path)
     options = list(vehicle.get('manutencoes', {}).get('por_quilometragem', {}).keys())
 
-    print()
-    for i, name in enumerate(options, 1):
-        print(f"  {i:2}. {display_name(name, vehicle)}")
-    print("   0. Outra")
-    print()
-    idx = select_index("Manutenção: ", len(options))
-    details = input("  Descreva: ").strip().replace(' ', '_').lower() if idx == 0 else options[idx - 1]
+    selected: list[str] = []
+    while True:
+        print()
+        for i, name in enumerate(options, 1):
+            marker = " ✓" if name in selected else ""
+            print(f"  {i:2}. {display_name(name, vehicle)}{marker}")
+        if selected:
+            print(f"   0. Concluir ({len(selected)} item(s))")
+        else:
+            print("   0. Outra (descrição livre)")
+        print()
+        idx = select_index("Item: ", len(options))
+
+        if idx == 0:
+            if not selected:
+                custom = input("  Descreva: ").strip().replace(' ', '_').lower()
+                selected.append(custom)
+            break
+
+        name = options[idx - 1]
+        if name in selected:
+            selected.remove(name)
+        else:
+            selected.append(name)
 
     odometer = prompt_odometer(csv_path)
-    cost = get_float("  Custo: ")
 
-    append_record(csv_path, [date_str, odometer, 2, f"{cost:.2f}", "0.00", details])
+    if len(selected) == 1:
+        cost = get_float("  Custo: ")
+        append_record(csv_path, [date_str, odometer, 2, f"{cost:.2f}", "0.00", selected[0]])
+    else:
+        sym = config.get('currency_symbol', 'R$')
+        print(f"\n  {len(selected)} itens — informe o custo de cada um (Enter = 0):\n")
+        costs: list[float] = []
+        for name in selected:
+            while True:
+                raw = input(f"  {display_name(name, vehicle)} [0]: ").strip().replace(',', '.')
+                if not raw:
+                    costs.append(0.0)
+                    break
+                try:
+                    v = float(raw)
+                    if v >= 0:
+                        costs.append(v)
+                        break
+                    print('❌ Valor deve ser >= 0')
+                except ValueError:
+                    print('❌ Apenas números')
+        total = sum(costs)
+        print(f"\n  Total: {sym}{total:.2f}")
+        for name, cost in zip(selected, costs):
+            append_record(csv_path, [date_str, odometer, 2, f"{cost:.2f}", "0.00", name])
+
     _finalize(csv_path, json_path, vehicle_name, date_str, odometer, config)
 
 
