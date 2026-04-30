@@ -341,6 +341,9 @@ def show_cost_analysis(csv_path: str, vehicle_name: str, config: dict) -> None:
 
     records = data[1:]
     sym = config.get('currency_symbol', 'R$')
+    json_path = config['veiculos_index'][vehicle_name]
+    vehicle = load_json(json_path) or {}
+    revisao_km: int | None = vehicle.get('intervalo_revisao_km')
 
     try:
         first_odo = int(records[0][1])
@@ -368,7 +371,8 @@ def show_cost_analysis(csv_path: str, vehicle_name: str, config: dict) -> None:
             continue
 
     fuel_avg = fuel_cost / total_km * 100
-    maint_per_100 = maint_cost / total_km * 100
+    maint_denom = revisao_km if revisao_km else total_km
+    maint_per_100 = maint_cost / maint_denom * 100
 
     # última média: último par de abastecimentos cheio-a-cheio
     fuel_records = [r for r in records if len(r) > 5 and r[2] == '1']
@@ -397,7 +401,8 @@ def show_cost_analysis(csv_path: str, vehicle_name: str, config: dict) -> None:
     print(row("Manut+última média:", maint_per_100 + last_fuel_per_100 if last_fuel_per_100 is not None else None))
 
     print()
-    print(row("  Manutenção:", maint_per_100))
+    maint_label = f"  Manutenção ({maint_denom}km):" if revisao_km else "  Manutenção:"
+    print(row(maint_label, maint_per_100))
     print(row("  Comb. geral:", fuel_avg))
     print(row("  Comb. última:", last_fuel_per_100))
 
