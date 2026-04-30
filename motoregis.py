@@ -385,19 +385,21 @@ def show_cost_analysis(csv_path: str, vehicle_name: str, config: dict) -> None:
                 pass
             break
 
-    print(f"\n--- Análise de Custos: {vehicle_name} ---")
-    print(f"  Período: {records[0][0]} → {records[-1][0]}  ({total_km} km)\n")
+    def row(label: str, value: float | None) -> str:
+        if value is None:
+            return f"  {label:<20} —"
+        return f"  {label:<20} {sym}{value:.2f}/100km"
 
-    print(f"  {'Manutenção + média geral:':<30} {sym}{maint_per_100 + fuel_avg:>7.2f} /100km")
-    if last_fuel_per_100 is not None:
-        print(f"  {'Manutenção + última média:':<30} {sym}{maint_per_100 + last_fuel_per_100:>7.2f} /100km")
-    else:
-        print(f"  {'Manutenção + última média:':<30} —  (sem cheio-a-cheio)")
+    print(f"\n--- Análise de Custos ---")
+    print(f"  {records[0][0]} → {records[-1][0]}  ({total_km} km)\n")
 
-    print(f"\n  {'  Manutenção:':<30} {sym}{maint_per_100:>7.2f} /100km")
-    print(f"  {'  Combustível (média geral):':<30} {sym}{fuel_avg:>7.2f} /100km")
-    if last_fuel_per_100 is not None:
-        print(f"  {'  Combustível (última média):':<30} {sym}{last_fuel_per_100:>7.2f} /100km")
+    print(row("Manut+média geral:", maint_per_100 + fuel_avg))
+    print(row("Manut+última média:", maint_per_100 + last_fuel_per_100 if last_fuel_per_100 is not None else None))
+
+    print()
+    print(row("  Manutenção:", maint_per_100))
+    print(row("  Comb. geral:", fuel_avg))
+    print(row("  Comb. última:", last_fuel_per_100))
 
 
 # ==========================================
