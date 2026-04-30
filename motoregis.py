@@ -49,13 +49,18 @@ def git_sync(vehicle_name: str, date_str: str, odometer: int, config: dict) -> N
 # ZONE 2: VALIDATORS
 # ==========================================
 
-def select_index(prompt: str, max_value: int) -> int:
+def select_index(prompt: str, max_value: int, valid_values: set[int] | None = None) -> int:
     while True:
         try:
             value = int(input(prompt))
-            if value in range(0, max_value + 1):
+            if valid_values is not None:
+                if value in valid_values:
+                    return value
+                print('❌ Opção inválida')
+            elif value in range(0, max_value + 1):
                 return value
-            print(f'❌ Entre 0 e {max_value}')
+            else:
+                print(f'❌ Entre 0 e {max_value}')
         except ValueError:
             print('❌ Digite um número inteiro')
 
@@ -328,6 +333,73 @@ def record_generic(csv_path: str, json_path: str, vehicle_name: str, category_id
     _finalize(csv_path, json_path, vehicle_name, date_str, odometer, config)
 
 
+def show_cost_analysis(csv_path: str, vehicle_name: str, config: dict) -> None:
+    data = read_csv(csv_path)
+    if len(data) <= 1:
+        print("  Sem registros suficientes.")
+        return
+
+    records = data[1:]
+    sym = config.get('currency_symbol', 'R$')
+
+    try:
+        first_odo = int(records[0][1])
+        last_odo = int(records[-1][1])
+        total_km = last_odo - first_odo
+    except (IndexError, ValueError):
+        print("  Erro ao ler odômetros.")
+        return
+
+    if total_km <= 0:
+        print("  Km total insuficiente.")
+        return
+
+    fuel_cost = 0.0
+    maint_cost = 0.0
+    for row in records:
+        try:
+            cost = float(row[3])
+            cat = int(row[2])
+            if cat == 1:
+                fuel_cost += cost
+            elif cat in (2, 4):
+                maint_cost += cost
+        except (IndexError, ValueError):
+            continue
+
+    fuel_avg = fuel_cost / total_km * 100
+    maint_per_100 = maint_cost / total_km * 100
+
+    # última média: último par de abastecimentos cheio-a-cheio
+    fuel_records = [r for r in records if len(r) > 5 and r[2] == '1']
+    last_fuel_per_100: float | None = None
+    for i in range(len(fuel_records) - 1, 0, -1):
+        curr, prev = fuel_records[i], fuel_records[i - 1]
+        if '|cheio' in curr[5] and '|cheio' in prev[5]:
+            try:
+                km = int(curr[1]) - int(prev[1])
+                cost = float(curr[3])
+                if km > 0:
+                    last_fuel_per_100 = cost / km * 100
+            except (ValueError, ZeroDivisionError):
+                pass
+            break
+
+    print(f"\n--- Análise de Custos: {vehicle_name} ---")
+    print(f"  Período: {records[0][0]} → {records[-1][0]}  ({total_km} km)\n")
+
+    print(f"  {'Manutenção + média geral:':<30} {sym}{maint_per_100 + fuel_avg:>7.2f} /100km")
+    if last_fuel_per_100 is not None:
+        print(f"  {'Manutenção + última média:':<30} {sym}{maint_per_100 + last_fuel_per_100:>7.2f} /100km")
+    else:
+        print(f"  {'Manutenção + última média:':<30} —  (sem cheio-a-cheio)")
+
+    print(f"\n  {'  Manutenção:':<30} {sym}{maint_per_100:>7.2f} /100km")
+    print(f"  {'  Combustível (média geral):':<30} {sym}{fuel_avg:>7.2f} /100km")
+    if last_fuel_per_100 is not None:
+        print(f"  {'  Combustível (última média):':<30} {sym}{last_fuel_per_100:>7.2f} /100km")
+
+
 # ==========================================
 # ZONE 4: INTERFACE
 # ==========================================
@@ -342,16 +414,21 @@ def main() -> None:
     csv_path = json_path.replace('.json', '.csv')
     current_date = datetime.now().strftime('%d/%m/%y')
 
+    _menu_valid = {0, 1, 2, 3, 4, 5, 6, 7, 9}
+
     while True:
         print(f"\n[ {vehicle_name} | {current_date} ]")
+        print("  0. Análise de Custos")
         for i, cat in enumerate(categories, 1):
             print(f"  {i}. {cat}")
-        print("  0. Sair")
+        print("  9. Sair")
 
-        choice = select_index("Opção: ", len(categories))
+        choice = select_index("Opção: ", 0, _menu_valid)
 
-        if choice == 0:
+        if choice == 9:
             break
+        elif choice == 0:
+            show_cost_analysis(csv_path, vehicle_name, config)
         elif choice == 1:
             record_fuel(csv_path, json_path, vehicle_name, current_date, config)
             break
