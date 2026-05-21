@@ -247,6 +247,45 @@ def _get_optional_cost(prompt: str) -> float:
             print('❌ Apenas números')
 
 
+def _compute_urgency(
+    name: str,
+    vehicle: dict,
+    data: list[list[str]],
+    current_odometer: float,
+    current_date_dt: datetime,
+) -> float:
+    maintenance = vehicle.get('manutencoes', {})
+    first_date = datetime.strptime(data[1][0], '%d/%m/%y') if len(data) > 1 else current_date_dt
+    first_odometer = float(data[1][1]) if len(data) > 1 else current_odometer
+
+    def _last_row(n: str) -> list | None:
+        for row in reversed(data[1:]):
+            if row[2] == '2' and row[5] == n:
+                return row
+        return None
+
+    last = _last_row(name)
+    ratios: list[float] = []
+
+    if name in maintenance.get('por_quilometragem', {}):
+        interval = maintenance['por_quilometragem'][name]
+        ref_odo = float(last[1]) if last else first_odometer
+        ratios.append((current_odometer - ref_odo) / interval if interval > 0 else 0.0)
+
+    if name in maintenance.get('por_tempo_dias', {}):
+        days = maintenance['por_tempo_dias'][name]
+        ref_date = datetime.strptime(last[0], '%d/%m/%y') if last else first_date
+        ratios.append((current_date_dt - ref_date).days / days if days > 0 else 0.0)
+
+    if name in maintenance.get('por_tempo_meses', {}):
+        months = maintenance['por_tempo_meses'][name]
+        ref_date = datetime.strptime(last[0], '%d/%m/%y') if last else first_date
+        delta_months = (current_date_dt.year - ref_date.year) * 12 + (current_date_dt.month - ref_date.month)
+        ratios.append(delta_months / months if months > 0 else 0.0)
+
+    return max(ratios) if ratios else 0.0
+
+
 def record_scheduled_maintenance(csv_path: str, json_path: str, vehicle_name: str, date_str: str, config: dict) -> None:
     print("\n--- Manutenção Preventiva ---")
     vehicle = load_json(json_path)
@@ -256,12 +295,23 @@ def record_scheduled_maintenance(csv_path: str, json_path: str, vehicle_name: st
             seen[k] = None
     options = list(seen.keys())
 
+    data = read_csv(csv_path)
+    try:
+        current_odometer = float(data[-1][1]) if len(data) > 1 else 0.0
+    except (IndexError, ValueError):
+        current_odometer = 0.0
+    current_date_dt = datetime.strptime(date_str, '%d/%m/%y')
+    urgencies = {n: _compute_urgency(n, vehicle, data, current_odometer, current_date_dt) for n in options}
+    options.sort(key=lambda n: urgencies[n], reverse=True)
+
     selected: list[str] = []
     while True:
         print()
         for i, name in enumerate(options, 1):
+            ratio = urgencies[name]
+            flag = " ⚠️" if ratio >= 1.0 else (" !" if ratio >= 0.8 else "")
             marker = " ✓" if name in selected else ""
-            print(f"  {i:2}. {display_name(name, vehicle)}{marker}")
+            print(f"  {i:2}. {display_name(name, vehicle)}{flag}{marker}")
         if selected:
             print(f"   0. Concluir ({len(selected)} item(s))")
         else:
