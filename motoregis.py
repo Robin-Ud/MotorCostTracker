@@ -115,27 +115,27 @@ def select_vehicle(config: dict) -> tuple[str | None, str | None, str | None]:
     json_path = config['veiculos_index'][name]
     return name, json_path, json_path.replace('.json', '.csv')
 
-def get_last_odometer(path: str) -> int:
+def get_last_odometer(path: str) -> float:
     data = read_csv(path)
     if len(data) <= 1:
-        return 0
+        return 0.0
     try:
-        return int(data[-1][1])
+        return float(data[-1][1])
     except (IndexError, ValueError):
-        return 0
+        return 0.0
 
-def get_last_fuel_record(path: str) -> tuple[int | None, float | None, str | None, bool]:
+def get_last_fuel_record(path: str) -> tuple[float | None, float | None, str | None, bool]:
     data = read_csv(path)
     for row in reversed(data[1:]):
         try:
             if row[2] == '1' and float(row[4]) > 0:
                 was_full = '|parcial' not in (row[5] if len(row) > 5 else '')
-                return int(row[1]), float(row[4]), row[0], was_full
+                return float(row[1]), float(row[4]), row[0], was_full
         except (IndexError, ValueError):
             continue
     return None, None, None, True
 
-def check_maintenance(csv_path: str, json_path: str, current_odometer: int, current_date: str) -> None:
+def check_maintenance(csv_path: str, json_path: str, current_odometer: float, current_date: str) -> None:
     vehicle = load_json(json_path)
     if vehicle is None:
         return
@@ -146,7 +146,7 @@ def check_maintenance(csv_path: str, json_path: str, current_odometer: int, curr
     maintenance = vehicle.get('manutencoes', {})
     current_date_dt = datetime.strptime(current_date, '%d/%m/%y')
     first_date = datetime.strptime(data[1][0], '%d/%m/%y')
-    first_odometer = int(data[1][1])
+    first_odometer = float(data[1][1])
     alerts = []
 
     def last_maintenance(name: str) -> list | None:
@@ -157,10 +157,10 @@ def check_maintenance(csv_path: str, json_path: str, current_odometer: int, curr
 
     for name, interval in maintenance.get('por_quilometragem', {}).items():
         last = last_maintenance(name)
-        ref_odometer = int(last[1]) if last else first_odometer
+        ref_odometer = float(last[1]) if last else first_odometer
         km_since = current_odometer - ref_odometer
         if km_since >= interval:
-            alerts.append((display_name(name, vehicle), f"{km_since} km atrás (a cada {interval} km)"))
+            alerts.append((display_name(name, vehicle), f"{km_since:g} km atrás (a cada {interval} km)"))
 
     for name, months in maintenance.get('por_tempo_meses', {}).items():
         last = last_maintenance(name)
@@ -183,16 +183,16 @@ def check_maintenance(csv_path: str, json_path: str, current_odometer: int, curr
             print(f"      {info}")
         print()
 
-def prompt_odometer(path: str) -> int:
+def prompt_odometer(path: str) -> float:
     last_km = get_last_odometer(path)
-    print(f"  Último odômetro: {last_km} km")
+    print(f"  Último odômetro: {last_km:g} km")
     while True:
-        odometer = get_int("  Odômetro atual (km): ")
+        odometer = get_float("  Odômetro atual (km): ")
         if odometer >= last_km:
             return odometer
-        print(f"❌ Odômetro não pode ser menor que o último registro ({last_km} km)")
+        print(f"❌ Odômetro não pode ser menor que o último registro ({last_km:g} km)")
 
-def _finalize(csv_path: str, json_path: str, vehicle_name: str, date_str: str, odometer: int, config: dict) -> None:
+def _finalize(csv_path: str, json_path: str, vehicle_name: str, date_str: str, odometer: float, config: dict) -> None:
     check_maintenance(csv_path, json_path, odometer, date_str)
     if config.get('git_sync', False):
         git_sync(vehicle_name, date_str, odometer, config)
@@ -201,7 +201,6 @@ def _finalize(csv_path: str, json_path: str, vehicle_name: str, date_str: str, o
 def record_fuel(csv_path: str, json_path: str, vehicle_name: str, date_str: str, config: dict) -> None:
     print("\n--- Abastecimento ---")
     last_odo, _, last_date, last_was_full = get_last_fuel_record(csv_path)
-    odometer = prompt_odometer(csv_path)
     cost = get_float("  Custo total: ")
     liters = get_float("  Litros: ")
 
@@ -221,6 +220,7 @@ def record_fuel(csv_path: str, json_path: str, vehicle_name: str, date_str: str,
             fuel = fuel_types[idx - 1] if idx > 0 else "outro"
             break
 
+    odometer = prompt_odometer(csv_path)
     details = f"{fuel}|{'cheio' if full_tank else 'parcial'}"
 
     append_record(csv_path, [date_str, odometer, 1, f"{cost:.2f}", f"{liters:.2f}", details])
@@ -229,9 +229,9 @@ def record_fuel(csv_path: str, json_path: str, vehicle_name: str, date_str: str,
         km_driven = odometer - last_odo
         sym = config.get('currency_symbol', 'R$')
         if full_tank and last_was_full:
-            print(f"\n  Consumo:      {km_driven / liters:.2f} km/L  ({km_driven} km / {liters:.2f} L)")
+            print(f"\n  Consumo:      {km_driven / liters:.2f} km/L  ({km_driven:g} km / {liters:.2f} L)")
             if km_driven > 0:
-                print(f"  Custo/100km:  {sym}{cost / km_driven * 100:.2f}  ({sym}{cost:.2f} / {km_driven} km)")
+                print(f"  Custo/100km:  {sym}{cost / km_driven * 100:.2f}  ({sym}{cost:.2f} / {km_driven:g} km)")
         else:
             print(f"\n  (consumo omitido — abastecimento parcial)")
         if last_date:
@@ -350,8 +350,8 @@ def show_cost_analysis(csv_path: str, vehicle_name: str, config: dict) -> None:
     revisao_km: int | None = vehicle.get('intervalo_revisao_km')
 
     try:
-        first_odo = int(records[0][1])
-        last_odo = int(records[-1][1])
+        first_odo = float(records[0][1])
+        last_odo = float(records[-1][1])
         total_km = last_odo - first_odo
     except (IndexError, ValueError):
         print("  Erro ao ler odômetros.")
@@ -385,7 +385,7 @@ def show_cost_analysis(csv_path: str, vehicle_name: str, config: dict) -> None:
         curr, prev = fuel_records[i], fuel_records[i - 1]
         if '|cheio' in curr[5] and '|cheio' in prev[5]:
             try:
-                km = int(curr[1]) - int(prev[1])
+                km = float(curr[1]) - float(prev[1])
                 cost = float(curr[3])
                 if km > 0:
                     last_fuel_per_100 = cost / km * 100
@@ -399,7 +399,7 @@ def show_cost_analysis(csv_path: str, vehicle_name: str, config: dict) -> None:
         return f"  {label:<20} {sym}{value:.2f}/100km"
 
     print(f"\n--- Análise de Custos ---")
-    print(f"  {records[0][0]} → {records[-1][0]}  ({total_km} km)\n")
+    print(f"  {records[0][0]} → {records[-1][0]}  ({total_km:g} km)\n")
 
     print(row("Manut+média geral:", maint_per_100 + fuel_avg))
     print(row("Manut+última média:", maint_per_100 + last_fuel_per_100 if last_fuel_per_100 is not None else None))
