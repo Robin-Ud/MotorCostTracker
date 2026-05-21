@@ -132,7 +132,7 @@ def check_maintenance(csv_path: str, json_path: str, current_odometer: float, cu
     current_date_dt = datetime.strptime(current_date, '%d/%m/%y')
     first_date = datetime.strptime(data[1][0], '%d/%m/%y')
     first_odometer = float(data[1][1])
-    alerts = []
+    alerts: dict[str, list[str]] = {}
 
     def last_maintenance(name: str) -> list | None:
         for row in reversed(data[1:]):
@@ -145,27 +145,28 @@ def check_maintenance(csv_path: str, json_path: str, current_odometer: float, cu
         ref_odometer = float(last[1]) if last else first_odometer
         km_since = current_odometer - ref_odometer
         if km_since >= interval:
-            alerts.append((display_name(name, vehicle), f"{km_since:g} km atrás (a cada {interval} km)"))
+            alerts.setdefault(display_name(name, vehicle), []).append(f"{km_since:g} km atrás (a cada {interval} km)")
 
     for name, months in maintenance.get('por_tempo_meses', {}).items():
         last = last_maintenance(name)
         ref_date = datetime.strptime(last[0], '%d/%m/%y') if last else first_date
         delta_months = (current_date_dt.year - ref_date.year) * 12 + (current_date_dt.month - ref_date.month)
         if delta_months >= months:
-            alerts.append((display_name(name, vehicle), f"{delta_months} meses atrás (a cada {months} meses)"))
+            alerts.setdefault(display_name(name, vehicle), []).append(f"{delta_months} meses atrás (a cada {months} meses)")
 
     for name, days in maintenance.get('por_tempo_dias', {}).items():
         last = last_maintenance(name)
         ref_date = datetime.strptime(last[0], '%d/%m/%y') if last else first_date
         delta_days = (current_date_dt - ref_date).days
         if delta_days >= days:
-            alerts.append((display_name(name, vehicle), f"{delta_days} dias atrás (a cada {days} dias)"))
+            alerts.setdefault(display_name(name, vehicle), []).append(f"{delta_days} dias atrás (a cada {days} dias)")
 
     if alerts:
         print("\n--- Manutenções pendentes ---\n")
-        for name_display, info in alerts:
+        for name_display, infos in alerts.items():
             print(f"  ⚠️  {name_display}")
-            print(f"      {info}")
+            for info in infos:
+                print(f"      {info}")
         print()
 
 def prompt_odometer(path: str) -> float:
@@ -322,19 +323,32 @@ def record_scheduled_maintenance(csv_path: str, json_path: str, vehicle_name: st
         else:
             print("   0. Outra (descrição livre)")
         print()
-        idx = select_index("Item: ", len(options))
+
+        raw = input("Item: ").strip()
+        if not raw:
+            if selected:
+                break
+            print('❌ Selecione um item ou 0 para descrição livre')
+            continue
+        try:
+            idx = int(raw)
+        except ValueError:
+            print('❌ Digite um número inteiro')
+            continue
 
         if idx == 0:
             if not selected:
                 custom = input("  Descreva: ").strip().replace(' ', '_').lower()
                 selected.append(custom)
             break
-
-        name = options[idx - 1]
-        if name in selected:
-            selected.remove(name)
+        elif 1 <= idx <= len(options):
+            name = options[idx - 1]
+            if name in selected:
+                selected.remove(name)
+            else:
+                selected.append(name)
         else:
-            selected.append(name)
+            print(f'❌ Entre 0 e {len(options)}')
 
     odometer = prompt_odometer(csv_path)
     sym = config.get('currency_symbol', 'R$')
@@ -530,16 +544,25 @@ def main() -> None:
                 vehicle_name, json_path, csv_path = new_name, new_json, new_csv
         elif choice == 7:
             today = datetime.now()
-            new_str = input(f"  Nova data DD/MM [{current_date}]: ").strip()
-            if new_str:
-                try:
-                    parsed = datetime.strptime(f"{new_str}/{today.year}", '%d/%m/%Y')
-                    if parsed.date() > today.date():
-                        print("❌ Data não pode ser no futuro")
-                    else:
-                        current_date = parsed.strftime('%d/%m/%y')
-                except ValueError:
-                    print("❌ Formato inválido. Use DD/MM")
+            while True:
+                new_str = input(f"  Nova data DD/MM [{current_date}]: ").strip()
+                if not new_str:
+                    break
+                parsed = None
+                for fmt, s in [('%d/%m/%Y', f"{new_str}/{today.year}"), ('%d/%m/%y', new_str)]:
+                    try:
+                        parsed = datetime.strptime(s, fmt)
+                        break
+                    except ValueError:
+                        continue
+                if parsed is None:
+                    print("❌ Formato inválido. Use DD/MM ou DD/MM/AA")
+                    continue
+                if parsed.date() > today.date():
+                    print("❌ Data não pode ser no futuro")
+                    continue
+                current_date = parsed.strftime('%d/%m/%y')
+                break
 
 if __name__ == '__main__':
     main()
