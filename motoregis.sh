@@ -9,6 +9,8 @@ python "$DIR/motoregis.py" "$@"
 
 if [ -d "$DIR/.git" ] && git -C "$DIR" remote get-url origin &>/dev/null; then
     git -C "$DIR" add veiculos/
-    git -C "$DIR" diff --cached --quiet || git -C "$DIR" commit -m "sync: auto"
-    git -C "$DIR" push --quiet
+    if ! git -C "$DIR" diff --cached --quiet; then
+        git -C "$DIR" commit -m "sync: auto"
+        git -C "$DIR" push --quiet
+    fi
 fi
