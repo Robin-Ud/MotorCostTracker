@@ -241,6 +241,7 @@ def record_fuel(csv_path: str, json_path: str, vehicle_name: str, date_str: str,
                 print(f"  Custo/dia:    {sym}{cost / days:.2f}  ({sym}{cost:.2f} / {days} dias)")
 
     _finalize(csv_path, json_path, vehicle_name, date_str, odometer, config)
+    show_cost_analysis(csv_path, vehicle_name, config)
 
 def _alloc_labor(labor: float, parts: list[float]) -> list[float]:
     n = len(parts)
@@ -378,25 +379,59 @@ def show_cost_analysis(csv_path: str, vehicle_name: str, config: dict) -> None:
     maint_denom = revisao_km if revisao_km else total_km
     maint_per_100 = maint_cost / maint_denom * 100
 
-    # última média: último par de abastecimentos cheio-a-cheio
     fuel_records = [r for r in records if len(r) > 5 and r[2] == '1']
+
+    # km/L e custo/100km: pares cheio-a-cheio
+    total_km_pairs = 0.0
+    total_liters_pairs = 0.0
+    for i in range(1, len(fuel_records)):
+        curr, prev = fuel_records[i], fuel_records[i - 1]
+        if '|cheio' in curr[5] and '|cheio' in prev[5]:
+            try:
+                km = float(curr[1]) - float(prev[1])
+                liters = float(curr[4])
+                if km > 0 and liters > 0:
+                    total_km_pairs += km
+                    total_liters_pairs += liters
+            except ValueError:
+                pass
+    fuel_kml_avg: float | None = total_km_pairs / total_liters_pairs if total_liters_pairs > 0 else None
+
     last_fuel_per_100: float | None = None
+    last_kml: float | None = None
     for i in range(len(fuel_records) - 1, 0, -1):
         curr, prev = fuel_records[i], fuel_records[i - 1]
         if '|cheio' in curr[5] and '|cheio' in prev[5]:
             try:
                 km = float(curr[1]) - float(prev[1])
+                liters = float(curr[4])
                 cost = float(curr[3])
-                if km > 0:
+                if km > 0 and liters > 0:
                     last_fuel_per_100 = cost / km * 100
+                    last_kml = km / liters
             except (ValueError, ZeroDivisionError):
                 pass
             break
 
-    def row(label: str, value: float | None) -> str:
+    first_date_dt = datetime.strptime(records[0][0], '%d/%m/%y')
+    last_date_dt = datetime.strptime(records[-1][0], '%d/%m/%y')
+    total_days = (last_date_dt - first_date_dt).days
+    amortized_maint = maint_per_100 / 100 * total_km
+    cost_per_day: float | None = (fuel_cost + amortized_maint) / total_days if total_days > 0 else None
+    fuel_per_day: float | None = fuel_cost / total_days if total_days > 0 else None
+
+    def row(label: str, value: float | None, kml: float | None = None) -> str:
         if value is None:
             return f"  {label:<20} —"
-        return f"  {label:<20} {sym}{value:.2f}/100km"
+        base = f"  {label:<20} {sym}{value:.2f}/100km"
+        if kml is not None:
+            base += f"  · {kml:.1f} km/L"
+        return base
+
+    def plain_row(label: str, value: float | None, unit: str = '') -> str:
+        if value is None:
+            return f"  {label:<20} —"
+        return f"  {label:<20} {sym}{value:.2f}{unit}"
 
     print(f"\n--- Análise de Custos ---")
     print(f"  {records[0][0]} → {records[-1][0]}  ({total_km:g} km)\n")
@@ -407,8 +442,10 @@ def show_cost_analysis(csv_path: str, vehicle_name: str, config: dict) -> None:
     print()
     maint_label = f"  Manutenção ({maint_denom}km):" if revisao_km else "  Manutenção:"
     print(row(maint_label, maint_per_100))
-    print(row("  Comb. geral:", fuel_avg))
-    print(row("  Comb. última:", last_fuel_per_100))
+    print(row("  Comb. geral:", fuel_avg, fuel_kml_avg))
+    print(row("  Comb. última:", last_fuel_per_100, last_kml))
+    print(plain_row("  Custo/dia:", cost_per_day, "/dia"))
+    print(plain_row("  Comb./dia:", fuel_per_day, "/dia"))
 
 
 # ==========================================
