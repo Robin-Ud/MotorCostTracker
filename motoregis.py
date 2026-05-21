@@ -170,12 +170,17 @@ def check_maintenance(csv_path: str, json_path: str, current_odometer: float, cu
 
 def prompt_odometer(path: str) -> float:
     last_km = get_last_odometer(path)
-    print(f"  Último odômetro: {last_km:g} km")
     while True:
-        odometer = get_float("  Odômetro atual (km): ")
-        if odometer >= last_km:
-            return odometer
-        print(f"❌ Odômetro não pode ser menor que o último registro ({last_km:g} km)")
+        raw = input(f"  Odômetro atual (km) [{last_km:g}]: ").strip().replace(',', '.')
+        if not raw:
+            return last_km
+        try:
+            odometer = float(raw)
+            if odometer >= last_km:
+                return odometer
+            print(f"❌ Odômetro não pode ser menor que o último registro ({last_km:g} km)")
+        except ValueError:
+            print('❌ Digite um número')
 
 def _finalize(csv_path: str, json_path: str, vehicle_name: str, date_str: str, odometer: float, config: dict) -> None:
     check_maintenance(csv_path, json_path, odometer, date_str)
@@ -335,7 +340,7 @@ def record_scheduled_maintenance(csv_path: str, json_path: str, vehicle_name: st
     sym = config.get('currency_symbol', 'R$')
 
     if len(selected) == 1:
-        cost = get_float("  Custo: ")
+        cost = _get_optional_cost("  Custo [0]: ")
         append_record(csv_path, [date_str, odometer, 2, f"{cost:.2f}", "0.00", selected[0]])
     else:
         print(f"\n  {len(selected)} itens — custo de peças por item (Enter = 0):\n")
