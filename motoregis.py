@@ -266,7 +266,11 @@ def _get_optional_cost(prompt: str) -> float:
 def record_scheduled_maintenance(csv_path: str, json_path: str, vehicle_name: str, date_str: str, config: dict) -> None:
     print("\n--- Manutenção Preventiva ---")
     vehicle = load_json(json_path)
-    options = list(vehicle.get('manutencoes', {}).get('por_quilometragem', {}).keys())
+    seen: dict[str, None] = {}
+    for cat in ('por_quilometragem', 'por_tempo_dias', 'por_tempo_meses'):
+        for k in vehicle.get('manutencoes', {}).get(cat, {}):
+            seen[k] = None
+    options = list(seen.keys())
 
     selected: list[str] = []
     while True:
