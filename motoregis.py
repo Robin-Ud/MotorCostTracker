@@ -1,7 +1,6 @@
 import csv
 import json
 import os
-import subprocess
 from datetime import datetime
 
 DATA_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -29,20 +28,6 @@ def append_record(path: str, row: list) -> None:
     with open(os.path.join(DATA_DIR, path), 'a', newline='', encoding='utf-8') as f:
         csv.writer(f).writerow(row)
 
-def git_sync(vehicle_name: str, date_str: str, odometer: int, config: dict) -> None:
-    if not os.path.exists(os.path.join(DATA_DIR, '.git')):
-        subprocess.run(['git', '-C', DATA_DIR, 'init'], capture_output=True)
-    remote_url = config.get('git_remote', '')
-    if remote_url:
-        has_remote = subprocess.run(['git', '-C', DATA_DIR, 'remote', 'get-url', 'origin'], capture_output=True)
-        if has_remote.returncode != 0:
-            subprocess.run(['git', '-C', DATA_DIR, 'remote', 'add', 'origin', remote_url], capture_output=True)
-    msg = f"record: {vehicle_name} | {date_str} | {odometer}km"
-    subprocess.run(['git', '-C', DATA_DIR, 'add', '.'], capture_output=True)
-    result = subprocess.run(['git', '-C', DATA_DIR, 'commit', '-m', msg], capture_output=True, text=True)
-    if result.returncode == 0:
-        subprocess.run(['git', '-C', DATA_DIR, 'pull', '--rebase'], capture_output=True)
-        subprocess.run(['git', '-C', DATA_DIR, 'push'], capture_output=True)
 
 
 # ==========================================
@@ -194,8 +179,6 @@ def prompt_odometer(path: str) -> float:
 
 def _finalize(csv_path: str, json_path: str, vehicle_name: str, date_str: str, odometer: float, config: dict) -> None:
     check_maintenance(csv_path, json_path, odometer, date_str)
-    if config.get('git_sync', False):
-        git_sync(vehicle_name, date_str, odometer, config)
     print("\n✅ Salvo!")
 
 def record_fuel(csv_path: str, json_path: str, vehicle_name: str, date_str: str, config: dict) -> None:
