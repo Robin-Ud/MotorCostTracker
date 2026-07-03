@@ -19,8 +19,7 @@ MotoRegis registra abastecimentos, manutenções e outros gastos de veículos di
 - Menu interativo no terminal
 - Múltiplos veículos configuráveis
 - Alertas de manutenção por km e por tempo (dias/meses)
-- Análise de custos por 100 km (abastecimento, manutenção, total)
-- Auto-sync com Git ao registrar (opcional)
+- Análise de custos detalhada (custo total e de combustível por 100 km, km/L média e do último tanque, custo por dia)
 - Apenas stdlib Python — sem `pip install` nenhum
 
 ## Instalação
@@ -47,7 +46,7 @@ Ao rodar, o script exibe o menu principal:
 === MotoRegis — Royal Enfield Himalayan 411 ===
 Odômetro: 1.234 km
 
-0. Análise de custos (por 100 km)
+0. Análise de custos
 1. Registrar abastecimento
 2. Registrar manutenção preventiva
 3. Registrar acessório / upgrade
@@ -117,8 +116,6 @@ Cada veículo tem um JSON em `veiculos/`. Exemplo de intervalos de manutenção:
   }
 }
 ```
-
-Para auto-sync com Git, adicione `"git_remote": "origin"` ao `configs.json`.
 
 ## Estrutura do projeto
 
