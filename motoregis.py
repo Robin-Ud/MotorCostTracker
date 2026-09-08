@@ -1,6 +1,7 @@
 import csv
 import json
 import os
+import statistics
 from datetime import datetime
 
 DATA_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -187,6 +188,21 @@ def _finalize(csv_path: str, json_path: str, vehicle_name: str, date_str: str, o
     check_maintenance(csv_path, json_path, odometer, date_str)
     print("\n✅ Salvo!")
 
+def _full_tank_km_history(csv_path: str) -> list[float]:
+    data = read_csv(csv_path)
+    fuel_records = [r for r in data[1:] if len(r) > 5 and r[2] == '1']
+    deltas: list[float] = []
+    for i in range(1, len(fuel_records)):
+        curr, prev = fuel_records[i], fuel_records[i - 1]
+        if '|cheio' in curr[5] and '|cheio' in prev[5] and 'gap' not in curr[5]:
+            try:
+                km = float(curr[1]) - float(prev[1])
+                if km > 0:
+                    deltas.append(km)
+            except ValueError:
+                pass
+    return deltas
+
 def record_fuel(csv_path: str, json_path: str, vehicle_name: str, date_str: str, config: dict) -> None:
     print("\n--- Abastecimento ---")
     last_odo, _, last_date, last_was_full = get_last_fuel_record(csv_path)
@@ -210,14 +226,33 @@ def record_fuel(csv_path: str, json_path: str, vehicle_name: str, date_str: str,
             break
 
     odometer = prompt_odometer(csv_path)
+    km_driven = (odometer - last_odo) if last_odo else 0.0
+
+    is_gap = False
+    if full_tank and last_was_full and last_odo and km_driven > 0:
+        history = _full_tank_km_history(csv_path)
+        if len(history) >= 3:
+            media = statistics.mean(history)
+            desvio = statistics.pstdev(history)
+            if km_driven > media + 2 * desvio:
+                resposta = input(
+                    f"\n  ⚠️  Essa distância ({km_driven:g} km) é bem maior que o normal "
+                    f"(média {media:.0f} km) — parece que teve abastecimento(s) não "
+                    f"registrados nesse intervalo. Marcar como lacuna? (s/n): "
+                ).strip().lower()
+                is_gap = resposta.startswith('s')
+
     details = f"{fuel}|{'cheio' if full_tank else 'parcial'}"
+    if is_gap:
+        details += "|gap"
 
     append_record(csv_path, [date_str, odometer, 1, f"{cost:.2f}", f"{liters:.2f}", details])
 
     if last_odo and liters > 0:
-        km_driven = odometer - last_odo
         sym = config.get('currency_symbol', 'R$')
-        if full_tank and last_was_full:
+        if is_gap:
+            print(f"\n  (consumo omitido — lacuna de abastecimento marcada)")
+        elif full_tank and last_was_full:
             print(f"\n  Consumo:      {km_driven / liters:.2f} km/L  ({km_driven:g} km / {liters:.2f} L)")
             if km_driven > 0:
                 print(f"  Custo/100km:  {sym}{cost / km_driven * 100:.2f}  ({sym}{cost:.2f} / {km_driven:g} km)")
@@ -438,7 +473,7 @@ def show_cost_analysis(csv_path: str, vehicle_name: str, config: dict) -> None:
     total_liters_pairs = 0.0
     for i in range(1, len(fuel_records)):
         curr, prev = fuel_records[i], fuel_records[i - 1]
-        if '|cheio' in curr[5] and '|cheio' in prev[5]:
+        if '|cheio' in curr[5] and '|cheio' in prev[5] and 'gap' not in curr[5]:
             try:
                 km = float(curr[1]) - float(prev[1])
                 liters = float(curr[4])
@@ -453,7 +488,7 @@ def show_cost_analysis(csv_path: str, vehicle_name: str, config: dict) -> None:
     last_kml: float | None = None
     for i in range(len(fuel_records) - 1, 0, -1):
         curr, prev = fuel_records[i], fuel_records[i - 1]
-        if '|cheio' in curr[5] and '|cheio' in prev[5]:
+        if '|cheio' in curr[5] and '|cheio' in prev[5] and 'gap' not in curr[5]:
             try:
                 km = float(curr[1]) - float(prev[1])
                 liters = float(curr[4])
