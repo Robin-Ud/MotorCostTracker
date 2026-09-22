@@ -565,6 +565,7 @@ def main() -> None:
         if choice == 9:
             break
         elif choice == 0:
+            check_maintenance(csv_path, json_path, get_last_odometer(csv_path), current_date)
             show_cost_analysis(csv_path, vehicle_name, config)
             break
         elif choice == 1:
