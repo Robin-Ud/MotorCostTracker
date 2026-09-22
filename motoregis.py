@@ -205,7 +205,7 @@ def _full_tank_km_history(csv_path: str) -> list[float]:
 
 def record_fuel(csv_path: str, json_path: str, vehicle_name: str, date_str: str, config: dict) -> None:
     print("\n--- Abastecimento ---")
-    last_odo, _, last_date, last_was_full = get_last_fuel_record(csv_path)
+    last_odo, _, _, last_was_full = get_last_fuel_record(csv_path)
     cost = get_float("  Custo total: ")
     liters = get_float("  Litros: ")
 
@@ -246,23 +246,11 @@ def record_fuel(csv_path: str, json_path: str, vehicle_name: str, date_str: str,
     if is_gap:
         details += "|gap"
 
-    append_record(csv_path, [date_str, odometer, 1, f"{cost:.2f}", f"{liters:.2f}", details])
+    tag_raw = input("  Tag do trecho (viagem/cidade) [Enter p/ pular]: ").strip().lower()
+    if tag_raw in ('viagem', 'cidade'):
+        details += f"|{tag_raw}"
 
-    if last_odo and liters > 0:
-        sym = config.get('currency_symbol', 'R$')
-        if is_gap:
-            print(f"\n  (consumo omitido — lacuna de abastecimento marcada)")
-        elif full_tank and last_was_full:
-            print(f"\n  Consumo:      {km_driven / liters:.2f} km/L  ({km_driven:g} km / {liters:.2f} L)")
-            if km_driven > 0:
-                print(f"  Custo/100km:  {sym}{cost / km_driven * 100:.2f}  ({sym}{cost:.2f} / {km_driven:g} km)")
-        else:
-            print(f"\n  (consumo omitido — abastecimento parcial)")
-        if last_date:
-            days = (datetime.strptime(date_str, '%d/%m/%y') - datetime.strptime(last_date, '%d/%m/%y')).days
-            threshold = config.get('daily_km_threshold', 40)
-            if days > 0 and km_driven / days <= threshold:
-                print(f"  Custo/dia:    {sym}{cost / days:.2f}  ({sym}{cost:.2f} / {days} dias)")
+    append_record(csv_path, [date_str, odometer, 1, f"{cost:.2f}", f"{liters:.2f}", details])
 
     _finalize(csv_path, json_path, vehicle_name, date_str, odometer, config)
     show_cost_analysis(csv_path, vehicle_name, config)
@@ -462,15 +450,17 @@ def show_cost_analysis(csv_path: str, vehicle_name: str, config: dict) -> None:
         except (IndexError, ValueError):
             continue
 
-    fuel_avg = fuel_cost / total_km * 100
+    fuel_avg = fuel_cost / total_km * 10
     maint_denom = revisao_km if revisao_km else total_km
-    maint_per_100 = maint_cost / maint_denom * 100
+    maint_per_10 = maint_cost / maint_denom * 10
 
     fuel_records = [r for r in records if len(r) > 5 and r[2] == '1']
 
-    # km/L e custo/100km: pares cheio-a-cheio
+    # km/L, km e dias médios entre abastecimentos: pares cheio-a-cheio
     total_km_pairs = 0.0
     total_liters_pairs = 0.0
+    total_days_pairs = 0
+    pair_count = 0
     for i in range(1, len(fuel_records)):
         curr, prev = fuel_records[i], fuel_records[i - 1]
         if '|cheio' in curr[5] and '|cheio' in prev[5] and 'gap' not in curr[5]:
@@ -480,12 +470,20 @@ def show_cost_analysis(csv_path: str, vehicle_name: str, config: dict) -> None:
                 if km > 0 and liters > 0:
                     total_km_pairs += km
                     total_liters_pairs += liters
+                    days = (datetime.strptime(curr[0], '%d/%m/%y') - datetime.strptime(prev[0], '%d/%m/%y')).days
+                    total_days_pairs += days
+                    pair_count += 1
             except ValueError:
                 pass
     fuel_kml_avg: float | None = total_km_pairs / total_liters_pairs if total_liters_pairs > 0 else None
+    avg_km_per_pair: float | None = total_km_pairs / pair_count if pair_count > 0 else None
+    avg_days_per_pair: float | None = total_days_pairs / pair_count if pair_count > 0 else None
 
-    last_fuel_per_100: float | None = None
+    last_fuel_per_10: float | None = None
     last_kml: float | None = None
+    last_km: float | None = None
+    last_days: int | None = None
+    last_tank_cost: float | None = None
     for i in range(len(fuel_records) - 1, 0, -1):
         curr, prev = fuel_records[i], fuel_records[i - 1]
         if '|cheio' in curr[5] and '|cheio' in prev[5] and 'gap' not in curr[5]:
@@ -494,8 +492,11 @@ def show_cost_analysis(csv_path: str, vehicle_name: str, config: dict) -> None:
                 liters = float(curr[4])
                 cost = float(curr[3])
                 if km > 0 and liters > 0:
-                    last_fuel_per_100 = cost / km * 100
+                    last_fuel_per_10 = cost / km * 10
                     last_kml = km / liters
+                    last_km = km
+                    last_days = (datetime.strptime(curr[0], '%d/%m/%y') - datetime.strptime(prev[0], '%d/%m/%y')).days
+                    last_tank_cost = cost
             except (ValueError, ZeroDivisionError):
                 pass
             break
@@ -503,36 +504,37 @@ def show_cost_analysis(csv_path: str, vehicle_name: str, config: dict) -> None:
     first_date_dt = datetime.strptime(records[0][0], '%d/%m/%y')
     last_date_dt = datetime.strptime(records[-1][0], '%d/%m/%y')
     total_days = (last_date_dt - first_date_dt).days
-    amortized_maint = maint_per_100 / 100 * total_km
+    amortized_maint = maint_per_10 / 10 * total_km
     cost_per_day: float | None = (fuel_cost + amortized_maint) / total_days if total_days > 0 else None
-    fuel_per_day: float | None = fuel_cost / total_days if total_days > 0 else None
+    cost_per_day_last: float | None = last_tank_cost / last_days if last_tank_cost is not None and last_days else None
 
-    def row(label: str, value: float | None, kml: float | None = None) -> str:
-        if value is None:
-            return f"  {label:<20} —"
-        base = f"  {label:<20} {sym}{value:.2f}/100km"
-        if kml is not None:
-            base += f"  · {kml:.1f} km/L"
-        return base
+    def deviation(value: float, baseline: float) -> float:
+        return (value - baseline) / baseline if baseline else 0.0
 
-    def plain_row(label: str, value: float | None, unit: str = '') -> str:
-        if value is None:
-            return f"  {label:<20} —"
-        return f"  {label:<20} {sym}{value:.2f}{unit}"
+    def row(default_tag: str, alt_tag: str, label: str, default_str: str, alt_str: str, last_val: float | None, geral_val: float | None) -> None:
+        line = f"  ({default_tag}){label} {default_str}"
+        if last_val is not None and geral_val is not None:
+            dev = deviation(last_val, geral_val)
+            line += f" ({dev:+.0%}"
+            if abs(dev) > 0.10:
+                line += f" - ({alt_tag}){alt_str}"
+            line += ")"
+        print(line)
 
-    print(f"\n--- Análise de Custos ---")
+    print(f"\n--- Resumo ---")
     print(f"  {records[0][0]} → {records[-1][0]}  ({total_km:g} km)\n")
 
-    print(row("Manut+média geral:", maint_per_100 + fuel_avg))
-    print(row("Manut+última média:", maint_per_100 + last_fuel_per_100 if last_fuel_per_100 is not None else None))
+    if last_kml is not None:
+        row('u', 'g', 'Km/L:', f"{last_kml:.2f} km/L", f"{fuel_kml_avg:.2f} km/L" if fuel_kml_avg is not None else '', last_kml, fuel_kml_avg)
+    if last_days is not None:
+        row('u', 'g', 'Dias rodados:', f"{last_days} dias", f"{avg_days_per_pair:.1f} dias" if avg_days_per_pair is not None else '', last_days, avg_days_per_pair)
+    if last_km is not None:
+        row('u', 'g', 'Km rodados:', f"{last_km:g} km", f"{avg_km_per_pair:.0f} km" if avg_km_per_pair is not None else '', last_km, avg_km_per_pair)
 
     print()
-    maint_label = f"  Manutenção ({maint_denom}km):" if revisao_km else "  Manutenção:"
-    print(row(maint_label, maint_per_100))
-    print(row("  Comb. geral:", fuel_avg, fuel_kml_avg))
-    print(row("  Comb. última:", last_fuel_per_100, last_kml))
-    print(plain_row("  Custo/dia:", cost_per_day, "/dia"))
-    print(plain_row("  Comb./dia:", fuel_per_day, "/dia"))
+    if cost_per_day is not None:
+        row('g', 'u', 'Custo/dia:', f"{sym}{cost_per_day:.2f}/dia", f"{sym}{cost_per_day_last:.2f}/dia" if cost_per_day_last is not None else '', cost_per_day_last, cost_per_day)
+    row('g', 'u', 'Custo/10km:', f"{sym}{fuel_avg:.2f}/10km", f"{sym}{last_fuel_per_10:.2f}/10km" if last_fuel_per_10 is not None else '', last_fuel_per_10, fuel_avg)
 
 
 # ==========================================
@@ -564,6 +566,7 @@ def main() -> None:
             break
         elif choice == 0:
             show_cost_analysis(csv_path, vehicle_name, config)
+            break
         elif choice == 1:
             record_fuel(csv_path, json_path, vehicle_name, current_date, config)
             break
