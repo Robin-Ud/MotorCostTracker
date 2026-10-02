@@ -121,6 +121,11 @@ def get_last_fuel_record(path: str) -> tuple[float | None, float | None, str | N
             continue
     return None, None, None, True
 
+def months_between(start: datetime, end: datetime) -> int:
+    """Meses completos — 27/04 → 01/10 são 5, não 6."""
+    months = (end.year - start.year) * 12 + (end.month - start.month)
+    return months - 1 if end.day < start.day else months
+
 def check_maintenance(csv_path: str, json_path: str, current_odometer: float, current_date: str) -> None:
     vehicle = load_json(json_path)
     if vehicle is None:
@@ -151,7 +156,7 @@ def check_maintenance(csv_path: str, json_path: str, current_odometer: float, cu
     for name, months in maintenance.get('por_tempo_meses', {}).items():
         last = last_maintenance(name)
         ref_date = datetime.strptime(last[0], '%d/%m/%y') if last else first_date
-        delta_months = (current_date_dt.year - ref_date.year) * 12 + (current_date_dt.month - ref_date.month)
+        delta_months = months_between(ref_date, current_date_dt)
         if delta_months >= months:
             alerts.setdefault(display_name(name, vehicle), []).append(f"{delta_months} meses atrás (a cada {months} meses)")
 
@@ -309,7 +314,7 @@ def _compute_urgency(
     if name in maintenance.get('por_tempo_meses', {}):
         months = maintenance['por_tempo_meses'][name]
         ref_date = datetime.strptime(last[0], '%d/%m/%y') if last else first_date
-        delta_months = (current_date_dt.year - ref_date.year) * 12 + (current_date_dt.month - ref_date.month)
+        delta_months = months_between(ref_date, current_date_dt)
         ratios.append(delta_months / months if months > 0 else 0.0)
 
     return max(ratios) if ratios else 0.0
