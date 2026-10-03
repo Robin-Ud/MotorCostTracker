@@ -7,7 +7,7 @@ Script Python puro para registro de gastos de veículos. Sem dependências exter
 ```bash
 python motoregis.py
 # ou via alias no .bashrc:
-alias motoregis='python ~/deving/MotorCostTracker/motoregis.py'
+alias motoregis='python ~/deving/veiculos-saude/MotorCostTracker/motoregis.py'
 ```
 
 ## Estrutura
