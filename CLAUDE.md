@@ -14,14 +14,17 @@ alias motoregis='python ~/deving/veiculos-saude/MotorCostTracker/motoregis.py'
 
 ```
 motoregis.py        ← script único
-configs.json        ← config global
-veiculos/
-  himalayan_22.json ← config e intervalos de manutenção
-  himalayan_22.csv  ← registros (append-only)
-  etios_16.json
+exemplo/            ← dados inventados (Honda CG 160 Titan, Chevrolet Onix), mesmo formato
+pessoal/            ← dados reais, fora do git (clone do repo privado veiculos-dados)
+  configs.json      ← config global
+  veiculos/
+    himalayan_22.json ← config e intervalos de manutenção
+    himalayan_22.csv  ← registros (append-only)
+    etios_16.json
 ```
 
-`DATA_DIR` é sempre o diretório do próprio script (`os.path.dirname(__file__)`).
+`DATA_DIR` é `pessoal/` ao lado do script; sem ela, `exemplo/`. A pasta tem o mesmo
+formato que o `motor_dir` do argos (que lê e grava nela também).
 
 `veiculos_index` em `configs.json` mapeia nome → caminho relativo do JSON. O CSV usa o mesmo caminho com extensão `.csv`.
 
@@ -65,3 +68,5 @@ Escolha de "mostrar por padrão o último vs. a média" é proposital: pilotagem
 - **Port para bot de Telegram**: manteria zonas 1-3 do `motoregis.py` quase intactas, trocando só a zona 4 (menu) por handlers do Telegram (`python-telegram-bot`). Isso rompe a regra de zero dependências externas — aceitável só nesse fork/port, não no script principal.
   - Ordem sugerida se for adiante: (a) bot recebendo foto e extraindo QR cru, (b) parser de nota de 1 estado da SEFAZ, (c) fluxo de confirmação + `append_record`, (d) cache de posto por CNPJ, (e) OCR fallback por último.
   - Custo: baixo — hospedagem em VPS free tier ou máquina própria, APIs do Telegram e da SEFAZ são grátis. Custo real é tempo de dev, principalmente por causa da variação de portal entre estados.
+
+@pessoal/CLAUDE.md

@@ -4,7 +4,12 @@ import os
 import statistics
 from datetime import datetime
 
-DATA_DIR = os.path.dirname(os.path.abspath(__file__))
+_AQUI = os.path.dirname(os.path.abspath(__file__))
+# seus veículos ficam em pessoal/ (fora do git; pode ser um clone de um repo privado seu).
+# Sem pessoal/, roda em cima do exemplo/ (Honda CG e Onix inventados).
+DATA_DIR = os.path.join(_AQUI, "pessoal")
+if not os.path.isdir(DATA_DIR):
+    DATA_DIR = os.path.join(_AQUI, "exemplo")
 
 
 # ==========================================

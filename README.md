@@ -38,6 +38,18 @@ alias motoregis='python ~/MotorCostTracker/motoregis.py'
 
 **Requisito:** Python 3.10+
 
+### Seus dados
+
+Os veículos e os registros ficam em `pessoal/`, fora do git. Sem ela, o script roda
+em cima do `exemplo/` (uma Honda CG 160 e um Onix inventados). Para começar os seus:
+
+```bash
+mkdir pessoal && cp -r exemplo/* pessoal/   # e edite pessoal/configs.json
+```
+
+Se `pessoal/` for um clone de um repo privado seu, o `motoregis.sh` faz pull antes e
+push depois de cada registro, e dá para registrar de mais de uma máquina.
+
 ## Uso
 
 Ao rodar, o script exibe o menu principal:
@@ -82,7 +94,7 @@ data,odometro,categoria,custo,litros,detalhes
 
 ## Configuração de veículo
 
-Cada veículo tem um JSON em `veiculos/`. Exemplo de intervalos de manutenção:
+Cada veículo tem um JSON em `pessoal/veiculos/`. Exemplo de intervalos de manutenção:
 
 ```json
 {
@@ -106,7 +118,7 @@ Cada veículo tem um JSON em `veiculos/`. Exemplo de intervalos de manutenção:
 }
 ```
 
-`configs.json` na raiz mapeia os nomes dos veículos para seus arquivos:
+`pessoal/configs.json` mapeia os nomes dos veículos para seus arquivos:
 
 ```json
 {
@@ -121,10 +133,13 @@ Cada veículo tem um JSON em `veiculos/`. Exemplo de intervalos de manutenção:
 
 ```
 motoregis.py        ← script único
-configs.json        ← config global e índice de veículos
-veiculos/
-  himalayan_22.json ← intervalos de manutenção do veículo
-  himalayan_22.csv  ← registros (append-only)
+motoregis.sh        ← wrapper (pull/push do pessoal/ quando ele é um clone git)
+exemplo/            ← dados inventados, no mesmo formato
+pessoal/            ← seus dados, fora do git
+  configs.json      ← config global e índice de veículos
+  veiculos/
+    himalayan_22.json ← intervalos de manutenção do veículo
+    himalayan_22.csv  ← registros (append-only)
 ```
 
 ## Contribuindo
