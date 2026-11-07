@@ -198,7 +198,39 @@ def _finalize(csv_path: str, json_path: str, vehicle_name: str, date_str: str, o
     check_maintenance(csv_path, json_path, odometer, date_str)
     print("\n✅ Salvo!")
 
+def _full_tank_stretches(fuel_records: list[list[str]]) -> list[tuple[float, float, float, int]]:
+    """Trechos cheio-a-cheio, do mais velho pro mais novo: (km, litros, custo, dias).
+
+    Parcial no meio soma litros e custo no próximo cheio (método do Drivvo): o tanque
+    volta ao mesmo nível, então tudo que entrou desde o cheio anterior foi o que rodou
+    esses km. Uma linha com gap em qualquer ponto do trecho descarta o trecho.
+    """
+    stretches: list[tuple[float, float, float, int]] = []
+    anchor: tuple[float, datetime] | None = None
+    liters = cost = 0.0
+    gap = False
+    for r in fuel_records:
+        try:
+            odo, l, c = float(r[1]), float(r[4]), float(r[3])
+            date = datetime.strptime(r[0], '%d/%m/%y')
+        except ValueError:
+            anchor = None
+            continue
+        liters += l
+        cost += c
+        gap = gap or 'gap' in r[5]
+        if '|cheio' in r[5]:
+            if anchor is not None and not gap:
+                km = odo - anchor[0]
+                if km > 0 and liters > 0:
+                    stretches.append((km, liters, cost, (date - anchor[1]).days))
+            anchor = (odo, date)
+            liters = cost = 0.0
+            gap = False
+    return stretches
+
 def _full_tank_km_history(csv_path: str) -> list[float]:
+    """Km de um tanque só (dois cheios seguidos, sem parcial no meio) — régua do gap."""
     data = read_csv(csv_path)
     fuel_records = [r for r in data[1:] if len(r) > 5 and r[2] == '1']
     deltas: list[float] = []
@@ -466,25 +498,12 @@ def show_cost_analysis(csv_path: str, vehicle_name: str, config: dict) -> None:
 
     fuel_records = [r for r in records if len(r) > 5 and r[2] == '1']
 
-    # km/L, km e dias médios entre abastecimentos: pares cheio-a-cheio
-    total_km_pairs = 0.0
-    total_liters_pairs = 0.0
-    total_days_pairs = 0
-    pair_count = 0
-    for i in range(1, len(fuel_records)):
-        curr, prev = fuel_records[i], fuel_records[i - 1]
-        if '|cheio' in curr[5] and '|cheio' in prev[5] and 'gap' not in curr[5]:
-            try:
-                km = float(curr[1]) - float(prev[1])
-                liters = float(curr[4])
-                if km > 0 and liters > 0:
-                    total_km_pairs += km
-                    total_liters_pairs += liters
-                    days = (datetime.strptime(curr[0], '%d/%m/%y') - datetime.strptime(prev[0], '%d/%m/%y')).days
-                    total_days_pairs += days
-                    pair_count += 1
-            except ValueError:
-                pass
+    # km/L, km e dias médios entre abastecimentos: trechos cheio-a-cheio, parciais somados
+    stretches = _full_tank_stretches(fuel_records)
+    total_km_pairs = sum(s[0] for s in stretches)
+    total_liters_pairs = sum(s[1] for s in stretches)
+    total_days_pairs = sum(s[3] for s in stretches)
+    pair_count = len(stretches)
     fuel_kml_avg: float | None = total_km_pairs / total_liters_pairs if total_liters_pairs > 0 else None
     avg_km_per_pair: float | None = total_km_pairs / pair_count if pair_count > 0 else None
     avg_days_per_pair: float | None = total_days_pairs / pair_count if pair_count > 0 else None
@@ -494,22 +513,10 @@ def show_cost_analysis(csv_path: str, vehicle_name: str, config: dict) -> None:
     last_km: float | None = None
     last_days: int | None = None
     last_tank_cost: float | None = None
-    for i in range(len(fuel_records) - 1, 0, -1):
-        curr, prev = fuel_records[i], fuel_records[i - 1]
-        if '|cheio' in curr[5] and '|cheio' in prev[5] and 'gap' not in curr[5]:
-            try:
-                km = float(curr[1]) - float(prev[1])
-                liters = float(curr[4])
-                cost = float(curr[3])
-                if km > 0 and liters > 0:
-                    last_fuel_per_10 = cost / km * 10
-                    last_kml = km / liters
-                    last_km = km
-                    last_days = (datetime.strptime(curr[0], '%d/%m/%y') - datetime.strptime(prev[0], '%d/%m/%y')).days
-                    last_tank_cost = cost
-            except (ValueError, ZeroDivisionError):
-                pass
-            break
+    if stretches:
+        last_km, last_liters, last_tank_cost, last_days = stretches[-1]
+        last_fuel_per_10 = last_tank_cost / last_km * 10
+        last_kml = last_km / last_liters
 
     first_date_dt = datetime.strptime(records[0][0], '%d/%m/%y')
     last_date_dt = datetime.strptime(records[-1][0], '%d/%m/%y')
