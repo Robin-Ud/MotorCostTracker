@@ -55,6 +55,13 @@ Abastecimentos (`categoria=1`) marcam `detalhes` como `combustivel|cheio` ou `co
 
 Escolha de "mostrar por padrão o último vs. a média" é proposital: pilotagem recente é o que motiva ação imediata, custo é melhor julgado pela tendência do período todo. No menu principal, escolher "0. Análise de Custos" agora encerra o programa depois de imprimir (não volta pro menu).
 
+## Commits
+
+Padrão do `~/.claude/CLAUDE.md` (Conventional Commits, descrição em português). Escopos:
+`abastecimento` (registro, cheio/parcial, tags), `manutencao` (itens, prazos, menu de
+manutenção), `custos` (análise, médias, km/L), `menu` (entrada no terminal), `dados`
+(CSV/JSON, pastas, `exemplo/`), `sync` (`motoregis.sh`, git), `ci`.
+
 ## Regras
 
 - Zero dependências externas — só stdlib (`csv`, `json`, `os`, `subprocess`, `datetime`)
